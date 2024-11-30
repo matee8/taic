@@ -7,7 +7,7 @@ repository = "https://github.com/matee8/llmcli.git"
 readme = "README.md"
 
 categories = ["command-line-utilites"]
-description = "A command-line interface for interacting with large language models"
+description = "A command-line interface for interacting with large language models."
 keywords = ["ai", "llm", "cli"]
 
 [lib]
@@ -25,6 +25,7 @@ lto = "fat"
 panic = "abort"
 
 [dependencies]
+clap = { version = "4.5.21", features = ["derive"] }
 
 [lints.rust]
 dead-code = "allow"
