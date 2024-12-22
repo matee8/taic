@@ -25,7 +25,6 @@ lto = "fat"
 panic = "abort"
 
 [dependencies]
-clap = { version = "4.5.21", features = ["derive"] }
 
 [lints.rust]
 dead-code = "allow"
