@@ -5,29 +5,11 @@ use std::{
 
 use clap::Parser as _;
 use llmcli::{
-    chatbots::dummy::DummyChatbot,
+    chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
     Chatbot, ChatbotError, Message, Role,
 };
 use thiserror::Error;
-
-#[tokio::main]
-async fn main() {
-    let args = Args::parse();
-
-    if let Err(err) = run_chat(match args.command {
-        Command::Dummy => DummyChatbot::new(),
-        _ => {
-            eprintln!("Error: Unknown chatbot.");
-            process::exit(1);
-        }
-    })
-    .await
-    {
-        eprintln!("Error: {err}");
-        process::exit(1);
-    }
-}
 
 #[derive(Debug, Error)]
 enum ChatError {
@@ -35,14 +17,13 @@ enum ChatError {
     Io(#[from] io::Error),
     #[error("{0}")]
     Chatbot(#[from] ChatbotError),
+    #[error("Unkown chatbot.")]
+    UnknownChatbot,
 }
 
-#[expect(
-    clippy::single_call_fn,
-    reason = r#"Traits with `async fn` have limitations using dynamic dispatch. 
-                `async_trait` uses the heap which isn't the optimal solution.
-                This function instead uses static dispatch to work around those."#
-)]
+// Traits with `async fn` have limitations using dynamic dispatch. 
+// `async_trait` uses the heap which isn't the optimal solution.
+// This function instead uses static dispatch to work around those.
 async fn run_chat<C>(chatbot: C) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
@@ -67,5 +48,19 @@ where
         let resp = chatbot.send_message(&hist).await?;
         println!("{}: {resp}", chatbot.name());
         hist.push(Message::new(Role::Assistant, resp));
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
+
+    if let Err(err) = match args.command {
+        Command::Gemini { model } => run_chat(GeminiChatbot::new(model)).await,
+        Command::Dummy => run_chat(DummyChatbot::new()).await,
+        _ => Err(ChatError::UnknownChatbot),
+    } {
+        eprintln!("Error: {err}");
+        process::exit(1);
     }
 }
