@@ -2,6 +2,8 @@ use core::future::Future;
 
 use thiserror::Error;
 
+pub mod cli;
+
 #[non_exhaustive]
 pub enum Role {
     System,
