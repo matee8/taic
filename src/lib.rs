@@ -2,18 +2,28 @@ use core::future::Future;
 
 use thiserror::Error;
 
+pub mod chatbots;
 pub mod cli;
 
 #[non_exhaustive]
+#[derive(PartialEq, Eq)]
 pub enum Role {
     System,
     User,
     Assistant,
 }
 
-pub struct Message<'content> {
+pub struct Message {
     role: Role,
-    content: &'content str,
+    content: String,
+}
+
+impl Message {
+    #[inline]
+    #[must_use]
+    pub const fn new(role: Role, content: String) -> Self {
+        Self { role, content }
+    }
 }
 
 #[non_exhaustive]
@@ -36,10 +46,10 @@ pub enum ChatbotError {
 }
 
 pub trait Chatbot {
-    fn name() -> &'static str;
+    fn name(&self) -> &'static str;
 
     fn send_message(
         &self,
-        messages: &[Message<'_>],
+        messages: &[Message],
     ) -> impl Future<Output = Result<String, ChatbotError>> + Send + Sync;
 }
