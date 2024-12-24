@@ -24,6 +24,7 @@ panic = "abort"
 [dependencies]
 clap = { version = "4.5.23", features = ["derive"] }
 thiserror = "2.0.9"
+tokio = { version = "1.42.0", features = ["rt-multi-thread", "macros"] }
 
 [lints.rust]
 dead-code = "allow"
