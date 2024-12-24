@@ -65,7 +65,7 @@ where
         hist.push(Message::new(Role::User, prompt));
 
         let resp = chatbot.send_message(&hist).await?;
-        println!("{resp}");
+        println!("{}: {resp}", chatbot.name());
         hist.push(Message::new(Role::Assistant, resp));
     }
 }
