@@ -10,9 +10,6 @@ categories = ["command-line-utilites"]
 description = "A command-line interface for interacting with large language models."
 keywords = ["ai", "llm", "cli"]
 
-[lib]
-path = "src/lib.rs"
-
 [profile.dev]
 opt-level = 1
 
