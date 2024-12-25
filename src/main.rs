@@ -7,7 +7,7 @@ use clap::Parser as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
-    Chatbot, ChatbotError, Message, Role,
+    ui, Chatbot, ChatbotError, Message, Role,
 };
 use thiserror::Error;
 
@@ -25,7 +25,9 @@ async fn main() {
         }
         _ => Err(ChatError::UnknownChatbot),
     } {
-        eprintln!("Error: {err}");
+        if let Err(err) = ui::print_error_message(&err.to_string()) {
+            eprintln!("Error printing message: {err}");
+        }
         process::exit(1);
     }
 }
@@ -57,7 +59,7 @@ where
     }
 
     loop {
-        print!("You: ");
+        ui::print_user_message()?;
         io::stdout().flush()?;
 
         let mut prompt = String::new();
@@ -72,7 +74,7 @@ where
         hist.push(Message::new(Role::User, prompt));
 
         let resp = chatbot.send_message(&hist).await?;
-        println!("{}: {resp}", chatbot.name());
+        ui::print_chatbot_message(chatbot.name(), &resp)?;
         hist.push(Message::new(Role::Assistant, resp));
     }
 }

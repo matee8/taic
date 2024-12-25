@@ -6,6 +6,7 @@ use thiserror::Error;
 
 pub mod chatbots;
 pub mod cli;
+pub mod ui;
 
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
