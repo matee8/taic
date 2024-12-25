@@ -35,9 +35,11 @@ impl Display for GeminiModel {
 #[non_exhaustive]
 #[derive(Subcommand)]
 pub enum Command {
+    #[command(about = "Chat with the Gemini chatbot")]
     Gemini {
         #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash)]
         model: GeminiModel,
     },
+    #[command(about = "Chat with the Dummy chatbot")]
     Dummy,
 }
