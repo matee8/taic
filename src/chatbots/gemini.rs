@@ -3,6 +3,7 @@ extern crate alloc;
 use alloc::borrow::Cow;
 use std::env;
 
+use futures_util::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -58,7 +59,7 @@ impl GeminiChatbot {
         let api_key = env::var("GEMINI_API_KEY")?;
 
         let url =
-            format!("{GEMINI_BASE_URL}{model}:generateContent?key={api_key}");
+            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
 
         let client = Client::new();
 
@@ -101,7 +102,7 @@ impl Chatbot for GeminiChatbot {
             contents: gemini_messages,
         };
 
-        let resp = self
+        let mut resp = self
             .client
             .post(&self.url)
             .json(&request_body)
@@ -113,44 +114,60 @@ impl Chatbot for GeminiChatbot {
                 } else {
                     ChatbotError::NetworkError(err)
                 }
-            })?;
+            })?
+            .bytes_stream();
 
-        let status = resp.status();
+        let mut buffer = String::new();
 
-        let payload = resp.text().await.map_err(|err| {
-            if err.is_timeout() {
-                ChatbotError::Timeout
-            } else {
-                ChatbotError::NetworkError(err)
-            }
-        })?;
-
-        if status.is_success() {
-            #[expect(
-                clippy::map_err_ignore,
-                reason = r#"Invalid JSON from the API indicates a critical error
+        while let Some(item) = resp.next().await {
+            match item {
+                Ok(bytes) => {
+                    #[expect(
+                        clippy::map_err_ignore,
+                        reason = r#"
+                            Invalid JSON from the API indicates a critical error
                             so we hide that detail from the end user, as they
-                            cannot address this issue."#
-            )]
-            let gemini_resp: GeminiResponse<'_> =
-                serde_json::from_str(&payload)
-                    .map_err(|_| ChatbotError::UnexpectedResponse)?;
+                            cannot address this issue.
+                        "#
+                    )]
+                    #[expect(
+                        clippy::indexing_slicing,
+                        reason = r#"
+                            The Gemini API prepends "data: " to each JSON
+                            chunk in the stream. We need to remove this
+                            non-JSON prefix before deserialization.
+                        "#
+                    )]
+                    let gemini_resp: GeminiResponse<'_> =
+                        serde_json::from_slice(&bytes[5..])
+                            .map_err(|_| ChatbotError::UnexpectedResponse)?;
 
-            Ok(gemini_resp
-                .candidates
-                .into_iter()
-                .next()
-                .and_then(|candidate| {
-                    candidate
-                        .content
-                        .parts
+                    let current_text = gemini_resp
+                        .candidates
                         .into_iter()
                         .next()
-                        .map(|part| Ok(part.text.into_owned()))
-                })
-                .unwrap_or_else(|| Err(ChatbotError::UnexpectedResponse))?)
-        } else {
-            Err(ChatbotError::ServerError)
+                        .and_then(|candidate| {
+                            candidate
+                                .content
+                                .parts
+                                .into_iter()
+                                .next()
+                                .map(|part| Ok(part.text.into_owned()))
+                        })
+                        .unwrap_or_else(|| {
+                            Err(ChatbotError::UnexpectedResponse)
+                        })?;
+
+                    print!("{current_text}");
+
+                    buffer.push_str(&current_text);
+                }
+                Err(_) => {
+                    return Err(ChatbotError::UnexpectedResponse);
+                }
+            }
         }
+
+        Ok(buffer)
     }
 }

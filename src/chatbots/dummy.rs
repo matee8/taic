@@ -23,15 +23,19 @@ impl Chatbot for DummyChatbot {
         &self,
         messages: &[crate::Message],
     ) -> Result<String, ChatbotError> {
-        messages.last().map_or_else(
-            || Ok("Dummy response to empty conversation.".to_owned()),
+        let msg = messages.last().map_or_else(
+            || "Dummy response to empty conversation.".to_owned(),
             |last_msg| {
                 if last_msg.role == Role::User {
-                    Ok(format!("Dummy response to: \"{}\".", last_msg.content))
+                    format!("Dummy response to: \"{}\".", last_msg.content)
                 } else {
-                    Ok("Dummy response.".to_owned())
+                    "Dummy response.".to_owned()
                 }
             },
-        )
+        );
+
+        println!("{msg}");
+
+        Ok(msg)
     }
 }

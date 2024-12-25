@@ -8,7 +8,7 @@ use crossterm::{
 };
 
 #[inline]
-pub fn print_chatbot_message(name: &str, message: &str) -> io::Result<()> {
+pub fn print_chatbot_message(name: &str) -> io::Result<()> {
     execute!(
         io::stdout(),
         SetForegroundColor(Color::Cyan),
@@ -17,8 +17,6 @@ pub fn print_chatbot_message(name: &str, message: &str) -> io::Result<()> {
         Print(": "),
         ResetColor,
         SetAttribute(Attribute::Reset),
-        Print(message),
-        Print("\n"),
     )
 }
 
