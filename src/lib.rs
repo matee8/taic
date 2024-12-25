@@ -25,9 +25,10 @@ pub enum Role {
     Assistant,
 }
 
+#[non_exhaustive]
 pub struct Message {
-    role: Role,
-    content: String,
+    pub role: Role,
+    pub content: String,
 }
 
 impl Message {

@@ -83,6 +83,81 @@ where
             continue;
         }
 
+        if prompt.starts_with('/') {
+            let parts: Vec<&str> = prompt.split_whitespace().collect();
+            let Some(command) = parts.first() else {
+                ui::print_error_message("No command specified.")?;
+                continue;
+            };
+
+            match *command {
+                "/clear" | "/c" => {
+                    hist.clear();
+                    ui::print_app_message("Context cleared.")?;
+                }
+                "/system" | "/s" => {
+                    if parts.len() > 1 {
+                        #[expect(
+                            clippy::indexing_slicing,
+                            reason = r#"
+                                Safe to index: `/system` command requires at
+                                least one argument, ensuring `parts` has
+                                length >= 2
+                            "#
+                        )]
+                        let new_msg =
+                            Message::new(Role::System, parts[1..].join(" "));
+                        if let Some(first) = hist.first_mut() {
+                            if first.role == Role::System {
+                                *first = new_msg;
+                            }
+                        } else {
+                            hist.insert(0, new_msg);
+                        }
+                        ui::print_app_message("System prompt set.")?;
+                    } else {
+                        ui::print_error_message("System prompt is required. Usage: /system <prompt>")?;
+                    }
+                }
+                "/info" | "/i" => {
+                    ui::print_app_message(&format!(
+                        "Current chatbot: {}",
+                        chatbot.name()
+                    ))?;
+                    if let &Some(system_msg) =
+                        &hist.iter().find(|msg| msg.role == Role::System)
+                    {
+                        ui::print_app_message(&format!(
+                            "System prompt: {}",
+                            system_msg.content
+                        ))?;
+                    }
+                }
+                "/help" | "/h" => {
+                    ui::print_app_message("Available commands:")?;
+                    ui::print_app_message(
+                        "/clear or /c - Clear the conversation history (including system prompt)",
+                    )?;
+                    ui::print_app_message("/system <prompt> or /s <prompt> - Set the system prompt")?;
+                    ui::print_app_message("/info or /i - Display current chatbot and model information")?;
+                    ui::print_app_message(
+                        "/help or /h - List all available commands",
+                    )?;
+                    ui::print_app_message(
+                        "/quit or /q - Exit the application",
+                    )?;
+                }
+                "/quit" | "/q" => {
+                    ui::print_app_message("Exiting...")?;
+                    break Ok(());
+                }
+                _ => {
+                    ui::print_error_message("Invalid command. Use /help or /h for a list of commands.")?;
+                }
+            }
+            continue;
+        }
+
         hist.push(Message::new(Role::User, prompt));
 
         ui::print_chatbot_message(chatbot.name())?;

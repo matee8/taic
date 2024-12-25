@@ -8,6 +8,20 @@ use crossterm::{
 };
 
 #[inline]
+pub fn print_app_message(message: &str) -> io::Result<()> {
+    execute!(
+        io::stdout(),
+        SetForegroundColor(Color::Blue),
+        SetAttribute(Attribute::Bold),
+        Print("llmcli: "),
+        ResetColor,
+        SetAttribute(Attribute::Reset),
+        Print(message),
+        Print("\n"),
+    )
+}
+
+#[inline]
 pub fn print_chatbot_message(name: &str) -> io::Result<()> {
     execute!(
         io::stdout(),
