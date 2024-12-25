@@ -17,10 +17,12 @@ async fn main() {
 
     if let Err(err) = match args.command {
         Command::Gemini { model } => match GeminiChatbot::new(&model) {
-            Ok(chatbot) => run_chat(chatbot).await,
+            Ok(chatbot) => run_chat(chatbot, args.system_prompt).await,
             Err(err) => Err(err.into()),
         },
-        Command::Dummy => run_chat(DummyChatbot::new()).await,
+        Command::Dummy => {
+            run_chat(DummyChatbot::new(), args.system_prompt).await
+        }
         _ => Err(ChatError::UnknownChatbot),
     } {
         eprintln!("Error: {err}");
@@ -41,11 +43,18 @@ enum ChatError {
 // Traits with `async fn` have limitations using dynamic dispatch.
 // `async_trait` uses the heap which isn't the optimal solution.
 // This function instead uses static dispatch to work around those.
-async fn run_chat<C>(chatbot: C) -> Result<(), ChatError>
+async fn run_chat<C>(
+    chatbot: C,
+    system_prompt: Option<String>,
+) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
 {
     let mut hist = Vec::new();
+
+    if let Some(prompt) = system_prompt {
+        hist.push(Message::new(Role::System, prompt));
+    }
 
     loop {
         print!("You: ");

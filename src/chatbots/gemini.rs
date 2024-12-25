@@ -24,7 +24,13 @@ struct GeminiMessage<'text> {
 }
 
 #[derive(Serialize)]
-struct GeminiRequest<'text> {
+struct SystemInstruction<'text> {
+    parts: Vec<GeminiPart<'text>>,
+}
+
+#[derive(Serialize)]
+struct GeminiRequest<'system, 'text> {
+    system_instruction: Option<SystemInstruction<'system>>,
     contents: Vec<GeminiMessage<'text>>,
 }
 
@@ -71,8 +77,17 @@ impl Chatbot for GeminiChatbot {
         &self,
         messages: &[crate::Message],
     ) -> Result<String, ChatbotError> {
+        let system = messages.iter().find(|msg| msg.role == Role::System).map(
+            |system_prompt| SystemInstruction {
+                parts: vec![GeminiPart {
+                    text: Cow::Borrowed(&system_prompt.content),
+                }],
+            },
+        );
+
         let gemini_messages: Vec<GeminiMessage<'_>> = messages
             .iter()
+            .filter(|msg| msg.role != Role::System)
             .map(|msg| GeminiMessage {
                 role: msg.role,
                 parts: vec![GeminiPart {
@@ -82,6 +97,7 @@ impl Chatbot for GeminiChatbot {
             .collect();
 
         let request_body = GeminiRequest {
+            system_instruction: system,
             contents: gemini_messages,
         };
 

@@ -9,6 +9,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub struct Args {
     #[command(subcommand)]
     pub command: Command,
+    #[arg(short, long, help = "Set the system prompt")]
+    pub system_prompt: Option<String>,
 }
 
 #[non_exhaustive]
