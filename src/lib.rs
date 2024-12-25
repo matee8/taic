@@ -1,15 +1,19 @@
 use core::future::Future;
+use std::env::VarError;
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod chatbots;
 pub mod cli;
 
 #[non_exhaustive]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
 pub enum Role {
     System,
     User,
+    #[serde(alias = "model")]
     Assistant,
 }
 
@@ -29,20 +33,16 @@ impl Message {
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum ChatbotError {
-    #[error("Invalid API key.")]
-    InvalidApiKey,
-    #[error("Authentication error.")]
-    AuthenticationError,
-    #[error("Rate limit exceeded.")]
-    RateLimitExceeded,
+    #[error("API key missing.")]
+    ApiKeyMissing(#[from] VarError),
+    #[error("Timeout.")]
+    Timeout,
     #[error("Server error.")]
     ServerError,
-    #[error("Model overloaded.")]
-    ModelOverloaded,
     #[error("Network error: {0}.")]
-    NetworkError(String),
-    #[error("Unexpected response: {0}.")]
-    UnexpectedResponse(String),
+    NetworkError(#[from] reqwest::Error),
+    #[error("Unexpected response.")]
+    UnexpectedResponse,
 }
 
 pub trait Chatbot {
