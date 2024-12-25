@@ -1,4 +1,6 @@
-use crate::{Chatbot, ChatbotError, Role};
+use futures::{stream, StreamExt as _};
+
+use crate::{Chatbot, ChatbotError, ResponseStream, Role};
 
 #[non_exhaustive]
 #[derive(Default)]
@@ -22,7 +24,7 @@ impl Chatbot for DummyChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<String, ChatbotError> {
+    ) -> Result<ResponseStream, ChatbotError> {
         let msg = messages.last().map_or_else(
             || "Dummy response to empty conversation.".to_owned(),
             |last_msg| {
@@ -34,8 +36,8 @@ impl Chatbot for DummyChatbot {
             },
         );
 
-        println!("{msg}");
+        let stream = stream::iter(vec![Ok(msg)]).boxed();
 
-        Ok(msg)
+        Ok(stream)
     }
 }

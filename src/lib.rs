@@ -1,12 +1,19 @@
-use core::future::Future;
+extern crate alloc;
+
+use alloc::boxed::Box;
+use core::{future::Future, pin::Pin};
 use std::env::VarError;
 
+use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod chatbots;
 pub mod cli;
 pub mod ui;
+
+type ResponseStream =
+    Pin<Box<dyn Stream<Item = Result<String, ChatbotError>> + Send + 'static>>;
 
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
@@ -52,5 +59,5 @@ pub trait Chatbot {
     fn send_message(
         &self,
         messages: &[Message],
-    ) -> impl Future<Output = Result<String, ChatbotError>> + Send + Sync;
+    ) -> impl Future<Output = Result<ResponseStream, ChatbotError>> + Send + Sync;
 }

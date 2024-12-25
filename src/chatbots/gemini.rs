@@ -1,13 +1,11 @@
-extern crate alloc;
-
 use alloc::borrow::Cow;
 use std::env;
 
-use futures_util::StreamExt as _;
+use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::{cli::GeminiModel, Chatbot, ChatbotError, Role};
+use crate::{cli::GeminiModel, Chatbot, ChatbotError, ResponseStream, Role};
 
 const GEMINI_BASE_URL: &str =
     "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -77,7 +75,7 @@ impl Chatbot for GeminiChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<String, ChatbotError> {
+    ) -> Result<ResponseStream, ChatbotError> {
         let system = messages.iter().find(|msg| msg.role == Role::System).map(
             |system_prompt| SystemInstruction {
                 parts: vec![GeminiPart {
@@ -102,7 +100,7 @@ impl Chatbot for GeminiChatbot {
             contents: gemini_messages,
         };
 
-        let mut resp = self
+        let resp_stream = self
             .client
             .post(&self.url)
             .json(&request_body)
@@ -117,10 +115,8 @@ impl Chatbot for GeminiChatbot {
             })?
             .bytes_stream();
 
-        let mut buffer = String::new();
-
-        while let Some(item) = resp.next().await {
-            match item {
+        let stream = resp_stream
+            .map(move |item| match item {
                 Ok(bytes) => {
                     #[expect(
                         clippy::map_err_ignore,
@@ -142,7 +138,7 @@ impl Chatbot for GeminiChatbot {
                         serde_json::from_slice(&bytes[5..])
                             .map_err(|_| ChatbotError::UnexpectedResponse)?;
 
-                    let current_text = gemini_resp
+                    Ok(gemini_resp
                         .candidates
                         .into_iter()
                         .next()
@@ -156,18 +152,12 @@ impl Chatbot for GeminiChatbot {
                         })
                         .unwrap_or_else(|| {
                             Err(ChatbotError::UnexpectedResponse)
-                        })?;
-
-                    print!("{current_text}");
-
-                    buffer.push_str(&current_text);
+                        })?)
                 }
-                Err(_) => {
-                    return Err(ChatbotError::UnexpectedResponse);
-                }
-            }
-        }
+                Err(_) => Err(ChatbotError::UnexpectedResponse),
+            })
+            .boxed();
 
-        Ok(buffer)
+        Ok(stream)
     }
 }

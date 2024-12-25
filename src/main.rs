@@ -4,6 +4,7 @@ use clap::Parser as _;
 use crossterm::style::{
     Attribute, Color, ResetColor, SetAttribute, SetForegroundColor,
 };
+use futures::StreamExt as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
@@ -85,7 +86,22 @@ where
         hist.push(Message::new(Role::User, prompt));
 
         ui::print_chatbot_message(chatbot.name())?;
-        let resp = chatbot.send_message(&hist).await?;
-        hist.push(Message::new(Role::Assistant, resp));
+        let mut full_resp = String::new();
+
+        let mut stream = chatbot.send_message(&hist).await?;
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(text) => {
+                    print!("{text}");
+                    full_resp.push_str(&text);
+                }
+                Err(err) => {
+                    return Err(err.into());
+                }
+            }
+        }
+
+        hist.push(Message::new(Role::Assistant, full_resp));
     }
 }
