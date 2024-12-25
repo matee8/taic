@@ -1,14 +1,15 @@
-use std::{
-    io::{self, Write as _},
-    process,
-};
+use std::{io, process};
 
 use clap::Parser as _;
+use crossterm::style::{
+    Attribute, Color, ResetColor, SetAttribute, SetForegroundColor,
+};
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
     ui, Chatbot, ChatbotError, Message, Role,
 };
+use rustyline::{error::ReadlineError, DefaultEditor};
 use thiserror::Error;
 
 #[tokio::main]
@@ -34,8 +35,10 @@ async fn main() {
 
 #[derive(Debug, Error)]
 enum ChatError {
-    #[error("{0}")]
+    #[error("Input/output error.")]
     Io(#[from] io::Error),
+    #[error("{0}.")]
+    Readline(#[from] ReadlineError),
     #[error("{0}")]
     Chatbot(#[from] ChatbotError),
     #[error("Unkown chatbot.")]
@@ -58,14 +61,22 @@ where
         hist.push(Message::new(Role::System, prompt));
     }
 
+    let mut rl = DefaultEditor::new()?;
+
+    // Cannot be a const str because we apply ANSI escape codes for colors based
+    // on terminal capabilities, which are determined at runtime.
+    // Using `crossterm` functions directly within a const str is also
+    // not possible as they are not `const fn` compatible.
+    let input_prompt = format!(
+        "{}{}You: {}{}",
+        SetForegroundColor(Color::Magenta),
+        SetAttribute(Attribute::Bold),
+        ResetColor,
+        SetAttribute(Attribute::Reset)
+    );
+
     loop {
-        ui::print_user_message()?;
-        io::stdout().flush()?;
-
-        let mut prompt = String::new();
-        io::stdin().read_line(&mut prompt)?;
-
-        let _: Option<char> = prompt.pop();
+        let prompt = rl.readline(&input_prompt)?;
 
         if prompt.trim().is_empty() {
             continue;
