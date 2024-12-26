@@ -8,7 +8,8 @@ use futures::StreamExt as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
-    ui, Chatbot, ChatbotError, Message, Role,
+    ui::Printer,
+    Chatbot, ChatbotError, Message, Role,
 };
 use rustyline::{error::ReadlineError, DefaultEditor};
 use thiserror::Error;
@@ -17,17 +18,22 @@ use thiserror::Error;
 async fn main() {
     let args = Args::parse();
 
+    let printer = Printer::new(args.no_color);
+
     if let Err(err) = match args.command {
         Command::Gemini { model, prompt } => match GeminiChatbot::new(&model) {
-            Ok(chatbot) => run_chat(chatbot, args.system_prompt, prompt).await,
+            Ok(chatbot) => {
+                run_chat(chatbot, args.system_prompt, prompt, &printer).await
+            }
             Err(err) => Err(err.into()),
         },
-        Command::Dummy {prompt}=> {
-            run_chat(DummyChatbot::new(), args.system_prompt, prompt).await
+        Command::Dummy { prompt } => {
+            run_chat(DummyChatbot::new(), args.system_prompt, prompt, &printer)
+                .await
         }
         _ => Err(ChatError::UnknownChatbot),
     } {
-        if let Err(err) = ui::print_error_message(&err.to_string()) {
+        if let Err(err) = printer.print_error_message(&err.to_string()) {
             eprintln!("Error printing message: {err}");
         }
         process::exit(1);
@@ -41,6 +47,7 @@ async fn run_chat<C>(
     chatbot: C,
     system_prompt: Option<String>,
     prompt: Option<String>,
+    printer: &Printer,
 ) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
@@ -60,20 +67,20 @@ where
             prompt
         };
 
-        handle_chat_message(input, &mut hist, &chatbot).await?;
+        handle_chat_message(input, &mut hist, &chatbot, printer).await?;
 
         return Ok(());
     }
 
     let mut rl = DefaultEditor::new()?;
 
-    let input_prompt = ui::get_input_prompt();
+    let input_prompt = printer.get_input_prompt();
 
     loop {
         let input = rl.readline(&input_prompt)?;
 
         if !io::stdin().is_terminal() {
-            handle_chat_message(input, &mut hist, &chatbot).await?;
+            handle_chat_message(input, &mut hist, &chatbot, printer).await?;
             break Ok(());
         }
 
@@ -82,9 +89,9 @@ where
         }
 
         if input.starts_with('/') {
-            handle_command(&input, &mut hist, &chatbot)?;
+            handle_command(&input, &mut hist, &chatbot, printer)?;
         } else {
-            handle_chat_message(input, &mut hist, &chatbot).await?;
+            handle_chat_message(input, &mut hist, &chatbot, printer).await?;
         }
     }
 }
@@ -107,20 +114,21 @@ fn handle_command<C>(
     line: &str,
     hist: &mut Vec<Message>,
     chatbot: &C,
+    printer: &Printer,
 ) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
 {
     let parts: Vec<&str> = line.split_whitespace().collect();
     let Some(command) = parts.first() else {
-        ui::print_error_message("No command specified.")?;
+        printer.print_error_message("No command specified.")?;
         return Ok(());
     };
 
     match *command {
         "/clear" | "/c" => {
             hist.clear();
-            ui::print_app_message("Context cleared.")?;
+            printer.print_app_message("Context cleared.")?;
         }
         "/system" | "/s" => {
             if parts.len() > 1 {
@@ -140,47 +148,49 @@ where
                 } else {
                     hist.insert(0, new_msg);
                 }
-                ui::print_app_message("System prompt set.")?;
+                printer.print_app_message("System prompt set.")?;
             } else {
-                ui::print_error_message(
+                printer.print_error_message(
                     "System prompt is required. Usage: /system <prompt>",
                 )?;
             }
         }
         "/info" | "/i" => {
-            ui::print_app_message(&format!(
+            printer.print_app_message(&format!(
                 "Current chatbot: {}",
                 chatbot.name()
             ))?;
             if let &Some(system_msg) =
                 &hist.iter().find(|msg| msg.role == Role::System)
             {
-                ui::print_app_message(&format!(
+                printer.print_app_message(&format!(
                     "System prompt: {}",
                     system_msg.content
                 ))?;
             }
         }
         "/help" | "/h" => {
-            ui::print_app_message("Available commands:")?;
-            ui::print_app_message(
+            printer.print_app_message("Available commands:")?;
+            printer.print_app_message(
                 "/clear or /c - Clear the conversation history (including system prompt)",
             )?;
-            ui::print_app_message(
+            printer.print_app_message(
                 "/system <prompt> or /s <prompt> - Set the system prompt",
             )?;
-            ui::print_app_message(
+            printer.print_app_message(
                 "/info or /i - Display current chatbot and model information",
             )?;
-            ui::print_app_message("/help or /h - List all available commands")?;
-            ui::print_app_message("/quit or /q - Exit the application")?;
+            printer.print_app_message(
+                "/help or /h - List all available commands",
+            )?;
+            printer.print_app_message("/quit or /q - Exit the application")?;
         }
         "/quit" | "/q" => {
-            ui::print_app_message("Exiting...")?;
+            printer.print_app_message("Exiting...")?;
             return Err(ChatError::Quit);
         }
         _ => {
-            ui::print_error_message(
+            printer.print_error_message(
                 "Invalid command. Use /help or /h for a list of commands.",
             )?;
         }
@@ -193,6 +203,7 @@ async fn handle_chat_message<C>(
     line: String,
     hist: &mut Vec<Message>,
     chatbot: &C,
+    printer: &Printer,
 ) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
@@ -200,7 +211,7 @@ where
     let user_message = Message::new(Role::User, line);
     hist.push(user_message);
 
-    ui::print_chatbot_prompt(chatbot.name())?;
+    printer.print_chatbot_prompt(chatbot.name())?;
 
     let mut full_resp = String::new();
 

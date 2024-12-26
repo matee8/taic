@@ -11,6 +11,8 @@ pub struct Args {
     pub command: Command,
     #[arg(short, long, help = "Set the system prompt")]
     pub system_prompt: Option<String>,
+    #[arg(long, help = "Disable colored output")]
+    pub no_color: bool,
 }
 
 #[non_exhaustive]
