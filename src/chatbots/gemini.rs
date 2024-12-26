@@ -1,12 +1,14 @@
 use alloc::borrow::Cow;
 use std::env;
 
+use async_trait::async_trait;
 use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    cli::GeminiModel, Chatbot, ChatbotError, InvalidModelError, ResponseStream, Role
+    cli::GeminiModel, Chatbot, ChatbotError, InvalidModelError, ResponseStream,
+    Role,
 };
 
 const GEMINI_BASE_URL: &str =
@@ -57,23 +59,64 @@ pub struct GeminiChatbot {
 
 impl GeminiChatbot {
     #[inline]
-    pub fn new(model: GeminiModel) -> Result<Self, ChatbotError> {
-        let api_key = env::var("GEMINI_API_KEY")?;
+    pub fn new(
+        model: &str,
+        api_key: Option<String>,
+    ) -> Result<Box<Self>, ChatbotError> {
+        let api_key = if let Some(api_key) = api_key {
+            api_key
+        } else {
+            env::var("GEMINI_API_KEY")?
+        };
+
+        let model = match model {
+            "gemini-2.0-flash-exp" => Ok(GeminiModel::Flash2_0Exp),
+            "gemini-1.5-flash" => Ok(GeminiModel::Flash1_5),
+            "gemini-1.5-flash.8b" => Ok(GeminiModel::Flash1_5_8B),
+            "gemini-1.5-pro" => Ok(GeminiModel::Pro1_5),
+            "gemini-1.0-pro" => Ok(GeminiModel::Pro1),
+            _ => Err(ChatbotError::UnknownModel),
+        }?;
 
         let url =
             format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
 
         let client = Client::new();
 
-        Ok(Self {
+        Ok(Box::new(Self {
             api_key,
             url,
             client,
             model,
-        })
+        }))
+    }
+
+    #[inline]
+    pub fn new_with_model(
+        model: GeminiModel,
+        api_key: Option<String>,
+    ) -> Result<Box<Self>, ChatbotError> {
+        let api_key = if let Some(api_key) = api_key {
+            api_key
+        } else {
+            env::var("GEMINI_API_KEY")?
+        };
+
+        let url =
+            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
+
+        let client = Client::new();
+
+        Ok(Box::new(Self {
+            api_key,
+            url,
+            client,
+            model,
+        }))
     }
 }
 
+#[async_trait]
 impl Chatbot for GeminiChatbot {
     #[inline]
     fn name(&self) -> &'static str {

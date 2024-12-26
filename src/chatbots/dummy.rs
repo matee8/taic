@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use futures::{stream, StreamExt as _};
 
 use crate::{Chatbot, ChatbotError, ResponseStream, Role};
@@ -8,12 +9,12 @@ pub struct DummyChatbot;
 
 impl DummyChatbot {
     #[inline]
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Result<Box<Self>, ChatbotError> {
+        Ok(Box::new(Self))
     }
 }
 
+#[async_trait]
 impl Chatbot for DummyChatbot {
     #[inline]
     fn name(&self) -> &'static str {
@@ -27,9 +28,9 @@ impl Chatbot for DummyChatbot {
 
     #[inline]
     fn change_model(
-            &mut self,
-            _new_model: &str,
-        ) -> Result<(), crate::InvalidModelError> {
+        &mut self,
+        _new_model: &str,
+    ) -> Result<(), crate::InvalidModelError> {
         Ok(())
     }
 

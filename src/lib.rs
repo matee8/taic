@@ -1,15 +1,17 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use core::{future::Future, pin::Pin};
+use core::pin::Pin;
 use std::env::VarError;
 
+use async_trait::async_trait;
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod chatbots;
 pub mod cli;
+pub mod config;
 pub mod ui;
 
 type ResponseStream =
@@ -57,8 +59,13 @@ pub enum ChatbotError {
     NetworkError(#[from] reqwest::Error),
     #[error("Unexpected response.")]
     UnexpectedResponse,
+    #[error("Unknown chatbot.")]
+    UnknownChatbot,
+    #[error("Unknown model.")]
+    UnknownModel,
 }
 
+#[async_trait]
 pub trait Chatbot {
     fn name(&self) -> &'static str;
 
@@ -69,8 +76,10 @@ pub trait Chatbot {
         new_model: &str,
     ) -> Result<(), InvalidModelError>;
 
-    fn send_message(
+    async fn send_message(
         &self,
         messages: &[Message],
-    ) -> impl Future<Output = Result<ResponseStream, ChatbotError>> + Send + Sync;
+    ) -> Result<ResponseStream, ChatbotError>;
 }
+
+pub trait Model {}

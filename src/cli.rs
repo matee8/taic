@@ -1,4 +1,5 @@
 use core::fmt::{self, Display, Formatter};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -8,11 +9,17 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(propagate_version = true)]
 pub struct Args {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
     #[arg(short, long, help = "Set the system prompt")]
     pub system_prompt: Option<String>,
     #[arg(long, help = "Disable colored output")]
     pub no_color: bool,
+    #[arg(short, long, help = "Custom config file path", value_name = "FILE")]
+    pub config: Option<PathBuf>,
+    #[arg(
+        help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode, only works if default_chatbot and default_model is set in configuration file)"
+    )]
+    pub prompt: Option<String>,
 }
 
 #[non_exhaustive]

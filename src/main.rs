@@ -1,5 +1,5 @@
 use std::{
-    io::{self, IsTerminal as _, Read as _},
+    io::{self, ErrorKind, IsTerminal as _, Read as _},
     process,
 };
 
@@ -8,6 +8,7 @@ use futures::StreamExt as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
+    config::{Config, ConfigLoadError},
     ui::Printer,
     Chatbot, ChatbotError, Message, Role,
 };
@@ -20,19 +21,79 @@ async fn main() {
 
     let printer = Printer::new(args.no_color);
 
-    if let Err(err) = match args.command {
-        Command::Gemini { model, prompt } => match GeminiChatbot::new(model) {
-            Ok(chatbot) => {
-                run_chat(chatbot, args.system_prompt, prompt, &printer).await
-            }
-            Err(err) => Err(err.into()),
-        },
-        Command::Dummy { prompt } => {
-            run_chat(DummyChatbot::new(), args.system_prompt, prompt, &printer)
-                .await
+    let config = match Config::load(args.config) {
+        Ok(config) => Some(config),
+        Err(ConfigLoadError::Io(err))
+            if matches!(err.kind(), ErrorKind::NotFound) =>
+        {
+            None
         }
-        _ => Err(ChatError::UnknownChatbot),
-    } {
+        Err(err) => {
+            if let Err(err) = printer.print_error_message(&err.to_string()) {
+                eprintln!("Error printing message: {err}");
+            }
+            process::exit(1);
+        }
+    };
+
+    let (chatbot, prompt): (
+        Result<Box<dyn Chatbot>, ChatbotError>,
+        Option<String>,
+    ) = match args.command {
+        Some(Command::Gemini { model, prompt }) => {
+            let api_key = if let Some(config) = config {
+                config.api_keys.gemini
+            } else {
+                None
+            };
+
+            match GeminiChatbot::new_with_model(model, api_key) {
+                Ok(chatbot) => (Ok(chatbot), prompt),
+                Err(err) => (Err(err), prompt),
+            }
+        }
+        Some(Command::Dummy { prompt }) => match DummyChatbot::new() {
+            Ok(chatbot) => (Ok(chatbot), prompt),
+            Err(err) => (Err(err), prompt),
+        },
+        Some(_) => (Err(ChatbotError::UnknownChatbot), None),
+        None => {
+            if let Some(config) = config {
+                match config.default_chatbot.as_ref() {
+                    "gemini" => {
+                        match GeminiChatbot::new(
+                            &config.default_model,
+                            config.api_keys.gemini,
+                        ) {
+                            Ok(chatbot) => (Ok(chatbot), args.prompt),
+                            Err(err) => (Err(err), args.prompt),
+                        }
+                    }
+                    "dummy" => match DummyChatbot::new() {
+                        Ok(chatbot) => (Ok(chatbot), args.prompt),
+                        Err(err) => (Err(err), args.prompt),
+                    },
+                    _ => (Err(ChatbotError::UnknownChatbot), None),
+                }
+            } else {
+                (Err(ChatbotError::UnknownChatbot), None)
+            }
+        }
+    };
+
+    let chatbot = match chatbot {
+        Ok(chatbot) => chatbot,
+        Err(err) => {
+            if let Err(err) = printer.print_error_message(&err.to_string()) {
+                eprintln!("Error printing message: {err}");
+            }
+            process::exit(1);
+        }
+    };
+
+    if let Err(err) =
+        run_chat(chatbot, args.system_prompt, prompt, &printer).await
+    {
         if let Err(err) = printer.print_error_message(&err.to_string()) {
             eprintln!("Error printing message: {err}");
         }
@@ -43,15 +104,12 @@ async fn main() {
 // Traits with `async fn` have limitations using dynamic dispatch.
 // `async_trait` uses the heap which isn't the optimal solution.
 // This function instead uses static dispatch to work around those.
-async fn run_chat<C>(
-    mut chatbot: C,
+async fn run_chat(
+    mut chatbot: Box<dyn Chatbot>,
     system_prompt: Option<String>,
     prompt: Option<String>,
     printer: &Printer,
-) -> Result<(), ChatError>
-where
-    C: Chatbot + Send + Sync,
-{
+) -> Result<(), ChatError> {
     let mut hist = Vec::new();
 
     if let Some(system_prompt) = system_prompt {
@@ -67,7 +125,7 @@ where
             prompt
         };
 
-        handle_chat_message(input, &mut hist, &chatbot, printer).await?;
+        handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
 
         return Ok(());
     }
@@ -80,7 +138,7 @@ where
         let input = rl.readline(&user_prefix)?;
 
         if !io::stdin().is_terminal() {
-            handle_chat_message(input, &mut hist, &chatbot, printer).await?;
+            handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
             break Ok(());
         }
 
@@ -91,7 +149,7 @@ where
         if input.starts_with('/') {
             handle_command(&input, &mut hist, &mut chatbot, printer)?;
         } else {
-            handle_chat_message(input, &mut hist, &chatbot, printer).await?;
+            handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
         }
     }
 }
@@ -110,15 +168,12 @@ enum ChatError {
     Quit,
 }
 
-fn handle_command<C>(
+fn handle_command(
     line: &str,
     hist: &mut Vec<Message>,
-    chatbot: &mut C,
+    chatbot: &mut Box<dyn Chatbot>,
     printer: &Printer,
-) -> Result<(), ChatError>
-where
-    C: Chatbot + Send + Sync,
-{
+) -> Result<(), ChatError> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     let Some(command) = parts.first() else {
         printer.print_error_message("No command specified.")?;
@@ -158,8 +213,15 @@ where
         "/model" | "/m" => {
             if let Some(new_model) = parts.get(1) {
                 match chatbot.change_model(new_model) {
-                    Ok(()) => printer.print_app_message(&format!("Chatbot model changed to {}", chatbot.model()))?,
-                    Err(err) => printer.print_error_message(&err.to_string())?,
+                    Ok(()) => {
+                        printer.print_app_message(&format!(
+                            "Chatbot model changed to {}",
+                            chatbot.model()
+                        ))?;
+                    }
+                    Err(err) => {
+                        printer.print_error_message(&err.to_string())?;
+                    }
                 }
             } else {
                 printer.print_error_message("No model specified.")?;
@@ -213,15 +275,12 @@ where
     Ok(())
 }
 
-async fn handle_chat_message<C>(
+async fn handle_chat_message(
     prompt: String,
     hist: &mut Vec<Message>,
-    chatbot: &C,
+    chatbot: &dyn Chatbot,
     printer: &Printer,
-) -> Result<(), ChatError>
-where
-    C: Chatbot + Send + Sync,
-{
+) -> Result<(), ChatError> {
     let user_message = Message::new(Role::User, prompt);
     hist.push(user_message);
 
