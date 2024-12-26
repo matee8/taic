@@ -74,10 +74,10 @@ where
 
     let mut rl = DefaultEditor::new()?;
 
-    let input_prompt = printer.get_input_prompt();
+    let user_prefix = printer.get_user_prefix();
 
     loop {
-        let input = rl.readline(&input_prompt)?;
+        let input = rl.readline(&user_prefix)?;
 
         if !io::stdin().is_terminal() {
             handle_chat_message(input, &mut hist, &chatbot, printer).await?;
@@ -214,7 +214,7 @@ where
 }
 
 async fn handle_chat_message<C>(
-    line: String,
+    prompt: String,
     hist: &mut Vec<Message>,
     chatbot: &C,
     printer: &Printer,
@@ -222,10 +222,10 @@ async fn handle_chat_message<C>(
 where
     C: Chatbot + Send + Sync,
 {
-    let user_message = Message::new(Role::User, line);
+    let user_message = Message::new(Role::User, prompt);
     hist.push(user_message);
 
-    printer.print_chatbot_prompt(chatbot.name())?;
+    printer.print_chatbot_prefix(chatbot.name())?;
 
     let mut full_resp = String::new();
 

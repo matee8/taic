@@ -65,7 +65,7 @@ pub enum Command {
     #[command(about = "Chat with the Dummy chatbot")]
     Dummy {
         #[arg(
-            help = "Input prompt (optional, no prompt starts interactive mode and reads from stdin)"
+            help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode)"
         )]
         prompt: Option<String>,
     },

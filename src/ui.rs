@@ -20,7 +20,7 @@ impl Printer {
 
     #[inline]
     #[must_use]
-    pub fn get_input_prompt(&self) -> String {
+    pub fn get_user_prefix(&self) -> String {
         if self.no_color {
             "You: ".to_owned()
         } else {
@@ -54,7 +54,7 @@ impl Printer {
     }
 
     #[inline]
-    pub fn print_chatbot_prompt(&self, name: &str) -> io::Result<()> {
+    pub fn print_chatbot_prefix(&self, name: &str) -> io::Result<()> {
         if self.no_color {
             print!("{name}: ");
             Ok(())
