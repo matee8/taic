@@ -30,9 +30,11 @@ async fn main() {
             None
         }
         Err(err) => {
-            if let Err(err) = printer.print_error_message(&err.to_string()) {
-                eprintln!("Error printing message: {err}");
-            }
+            let _: Result<(), ()> = printer
+                .print_error_message(&err.to_string())
+                .map_err(|err| {
+                    eprintln!("Error printing message: {err}");
+                });
             process::exit(1);
         }
     };
@@ -78,9 +80,11 @@ async fn main() {
     let chatbot = match chatbot {
         Ok(chatbot) => chatbot,
         Err(err) => {
-            if let Err(err) = printer.print_error_message(&err.to_string()) {
-                eprintln!("Error printing message: {err}");
-            }
+            let _: Result<(), ()> = printer
+                .print_error_message(&err.to_string())
+                .map_err(|err| {
+                    eprintln!("Error printing message: {err}");
+                });
             process::exit(1);
         }
     };
@@ -88,17 +92,21 @@ async fn main() {
     if let Err(err) =
         run_chat(chatbot, args.system_prompt, prompt, &printer).await
     {
-        if let Err(err) = printer.print_error_message(&err.to_string()) {
-            eprintln!("Error printing message: {err}");
-        }
+        let _: Result<(), ()> = printer
+            .print_error_message(&err.to_string())
+            .map_err(|err| {
+                eprintln!("Error printing message: {err}");
+            });
         process::exit(1);
     }
 }
 
 #[derive(Debug, Error)]
 enum ChatError {
-    #[error("Input/output error.")]
-    Io(#[from] io::Error),
+    #[error("Failed to read from stdin: {0}.")]
+    Read(io::Error),
+    #[error("Failed to print message: {0}.")]
+    Print(io::Error),
     #[error("{0}.")]
     Readline(#[from] ReadlineError),
     #[error("{0}")]
@@ -124,7 +132,7 @@ async fn run_chat(
     if let Some(prompt) = prompt {
         let input = if prompt == "-" {
             let mut input = String::new();
-            io::stdin().read_to_string(&mut input)?;
+            io::stdin().read_to_string(&mut input).map_err(ChatError::Read)?;
             input
         } else {
             prompt
@@ -133,7 +141,7 @@ async fn run_chat(
         let user_message = Message::new(Role::User, input);
         session.messages.push(user_message);
 
-        printer.print_chatbot_prefix(chatbot.name())?;
+        printer.print_chatbot_prefix(chatbot.name()).map_err(ChatError::Print)?;
 
         handle_chat_message(&session.messages, &*chatbot).await?;
 
@@ -169,8 +177,8 @@ async fn run_chat(
 
 #[derive(Debug, Error)]
 enum CommandError {
-    #[error("{0}")]
-    Io(#[from] io::Error),
+    #[error("Failed to print message: {0}")]
+    Print(#[from] io::Error),
     #[error("{0}")]
     ChatbotSwitch(#[from] ChatbotCreationError),
     #[error("{0}")]

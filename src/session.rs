@@ -112,5 +112,4 @@ impl Session {
 
         Ok(session_dir)
     }
-
 }
