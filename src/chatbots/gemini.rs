@@ -75,7 +75,11 @@ impl Chatbot for GeminiChatbot {
     #[inline]
     fn model(&self) -> &'static str {
         match self.model {
-            GeminiModel::Flash1_5 => "1.5-flash"
+            GeminiModel::Flash2_0Exp => "2.0 Flash (Experimental)",
+            GeminiModel::Flash1_5 => "1.5 Flash",
+            GeminiModel::Flash1_5_8B => "1.5 Flash-8B",
+            GeminiModel::Pro1_5 => "1.5 Pro",
+            GeminiModel::Pro1 => "1.0 Pro (Deprecated)",
         }
     }
 

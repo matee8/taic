@@ -18,8 +18,16 @@ pub struct Args {
 #[non_exhaustive]
 #[derive(Debug, Clone, ValueEnum)]
 pub enum GeminiModel {
+    #[clap(name = "gemini-2.0-flash-exp")]
+    Flash2_0Exp,
     #[clap(name = "gemini-1.5-flash")]
     Flash1_5,
+    #[clap(name = "gemini-1.5-flash-8b")]
+    Flash1_5_8B,
+    #[clap(name = "gemini-1.5-pro")]
+    Pro1_5,
+    #[clap(name = "gemini-1.0-pro")]
+    Pro1,
 }
 
 impl Display for GeminiModel {
@@ -30,8 +38,12 @@ impl Display for GeminiModel {
                     implementation."#
     )]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            &Self::Flash1_5 => writeln!(f, "gemini-1.5-flash"),
+        match *self {
+            Self::Flash2_0Exp => writeln!(f, "gemini-2.0-flash-exp"),
+            Self::Flash1_5 => writeln!(f, "gemini-1.5-flash"),
+            Self::Flash1_5_8B => writeln!(f, "gemini-1.5-flash-8b"),
+            Self::Pro1_5 => writeln!(f, "gemini-1.5-pro"),
+            Self::Pro1 => writeln!(f, "gemini-1.0-pro"),
         }
     }
 }

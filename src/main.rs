@@ -160,7 +160,10 @@ where
                 "Current chatbot: {}",
                 chatbot.name()
             ))?;
-            printer.print_app_message(&format!("Current model: {}", chatbot.model()))?;
+            printer.print_app_message(&format!(
+                "Current model: {}",
+                chatbot.model()
+            ))?;
             if let &Some(system_msg) =
                 &hist.iter().find(|msg| msg.role == Role::System)
             {
