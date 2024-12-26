@@ -47,12 +47,12 @@ async fn main() {
                 None
             };
 
-            match GeminiChatbot::new_with_model(model, api_key) {
+            match GeminiChatbot::create(model.to_string(), api_key) {
                 Ok(chatbot) => (Ok(chatbot), prompt),
                 Err(err) => (Err(err), prompt),
             }
         }
-        Some(Command::Dummy { prompt }) => match DummyChatbot::new() {
+        Some(Command::Dummy { prompt }) => match DummyChatbot::create(String::new(), None) {
             Ok(chatbot) => (Ok(chatbot), prompt),
             Err(err) => (Err(err), prompt),
         },
@@ -61,15 +61,15 @@ async fn main() {
             if let Some(config) = config {
                 match config.default_chatbot.as_ref() {
                     "gemini" => {
-                        match GeminiChatbot::new(
-                            &config.default_model,
+                        match GeminiChatbot::create(
+                            config.default_model,
                             config.api_keys.gemini,
                         ) {
                             Ok(chatbot) => (Ok(chatbot), args.prompt),
                             Err(err) => (Err(err), args.prompt),
                         }
                     }
-                    "dummy" => match DummyChatbot::new() {
+                    "dummy" => match DummyChatbot::create(String::new(), None) {
                         Ok(chatbot) => (Ok(chatbot), args.prompt),
                         Err(err) => (Err(err), args.prompt),
                     },
@@ -212,7 +212,7 @@ fn handle_command(
         }
         "/model" | "/m" => {
             if let Some(new_model) = parts.get(1) {
-                match chatbot.change_model(new_model) {
+                match chatbot.change_model((*new_model).to_owned()) {
                     Ok(()) => {
                         printer.print_app_message(&format!(
                             "Chatbot model changed to {}",

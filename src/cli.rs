@@ -48,11 +48,11 @@ impl Display for GeminiModel {
     )]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Flash2_0Exp => writeln!(f, "gemini-2.0-flash-exp"),
-            Self::Flash1_5 => writeln!(f, "gemini-1.5-flash"),
-            Self::Flash1_5_8B => writeln!(f, "gemini-1.5-flash-8b"),
-            Self::Pro1_5 => writeln!(f, "gemini-1.5-pro"),
-            Self::Pro1 => writeln!(f, "gemini-1.0-pro"),
+            Self::Flash2_0Exp => write!(f, "gemini-2.0-flash-exp"),
+            Self::Flash1_5 => write!(f, "gemini-1.5-flash"),
+            Self::Flash1_5_8B => write!(f, "gemini-1.5-flash-8b"),
+            Self::Pro1_5 => write!(f, "gemini-1.5-pro"),
+            Self::Pro1 => write!(f, "gemini-1.0-pro"),
         }
     }
 }

@@ -67,13 +67,20 @@ pub enum ChatbotError {
 
 #[async_trait]
 pub trait Chatbot {
+    fn create(
+        model: String,
+        api_key: Option<String>,
+    ) -> Result<Box<dyn Chatbot>, ChatbotError>
+    where
+        Self: Sized;
+
     fn name(&self) -> &'static str;
 
     fn model(&self) -> &'static str;
 
     fn change_model(
         &mut self,
-        new_model: &str,
+        new_model: String,
     ) -> Result<(), InvalidModelError>;
 
     async fn send_message(

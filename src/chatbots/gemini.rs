@@ -6,13 +6,18 @@ use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    cli::GeminiModel, Chatbot, ChatbotError, InvalidModelError, ResponseStream,
-    Role,
-};
+use crate::{Chatbot, ChatbotError, InvalidModelError, ResponseStream, Role};
 
 const GEMINI_BASE_URL: &str =
     "https://generativelanguage.googleapis.com/v1beta/models/";
+
+const AVAILABLE_MODELS: [&str; 5] = [
+    "gemini-2.0-flash-exp",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro",
+];
 
 #[derive(Serialize, Deserialize)]
 struct GeminiPart<'text> {
@@ -54,70 +59,39 @@ pub struct GeminiChatbot {
     api_key: String,
     url: String,
     client: Client,
-    model: GeminiModel,
-}
-
-impl GeminiChatbot {
-    #[inline]
-    pub fn new(
-        model: &str,
-        api_key: Option<String>,
-    ) -> Result<Box<Self>, ChatbotError> {
-        let api_key = if let Some(api_key) = api_key {
-            api_key
-        } else {
-            env::var("GEMINI_API_KEY")?
-        };
-
-        let model = match model {
-            "gemini-2.0-flash-exp" => Ok(GeminiModel::Flash2_0Exp),
-            "gemini-1.5-flash" => Ok(GeminiModel::Flash1_5),
-            "gemini-1.5-flash.8b" => Ok(GeminiModel::Flash1_5_8B),
-            "gemini-1.5-pro" => Ok(GeminiModel::Pro1_5),
-            "gemini-1.0-pro" => Ok(GeminiModel::Pro1),
-            _ => Err(ChatbotError::UnknownModel),
-        }?;
-
-        let url =
-            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
-
-        let client = Client::new();
-
-        Ok(Box::new(Self {
-            api_key,
-            url,
-            client,
-            model,
-        }))
-    }
-
-    #[inline]
-    pub fn new_with_model(
-        model: GeminiModel,
-        api_key: Option<String>,
-    ) -> Result<Box<Self>, ChatbotError> {
-        let api_key = if let Some(api_key) = api_key {
-            api_key
-        } else {
-            env::var("GEMINI_API_KEY")?
-        };
-
-        let url =
-            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
-
-        let client = Client::new();
-
-        Ok(Box::new(Self {
-            api_key,
-            url,
-            client,
-            model,
-        }))
-    }
+    model: String,
 }
 
 #[async_trait]
 impl Chatbot for GeminiChatbot {
+    #[inline]
+    fn create(
+        model: String,
+        api_key: Option<String>,
+    ) -> Result<Box<dyn Chatbot>, ChatbotError> {
+        let api_key = if let Some(api_key) = api_key {
+            api_key
+        } else {
+            env::var("GEMINI_API_KEY")?
+        };
+
+        if !AVAILABLE_MODELS.contains(&model.as_str()) {
+            return Err(ChatbotError::UnknownModel);
+        }
+
+        let url =
+            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
+
+        let client = Client::new();
+
+        Ok(Box::new(Self {
+            api_key,
+            url,
+            client,
+            model,
+        }))
+    }
+
     #[inline]
     fn name(&self) -> &'static str {
         "Gemini"
@@ -125,28 +99,33 @@ impl Chatbot for GeminiChatbot {
 
     #[inline]
     fn model(&self) -> &'static str {
-        match self.model {
-            GeminiModel::Flash2_0Exp => "2.0 Flash (Experimental)",
-            GeminiModel::Flash1_5 => "1.5 Flash",
-            GeminiModel::Flash1_5_8B => "1.5 Flash-8B",
-            GeminiModel::Pro1_5 => "1.5 Pro",
-            GeminiModel::Pro1 => "1.0 Pro (Deprecated)",
+        #[expect(
+            clippy::unreachable, 
+            reason = r#"
+                `model` is validated on initialization and in `change_model`,
+                so it should always be a valid name.
+            "#
+        )]
+        match self.model.as_str() {
+            "gemini-2.0-flash-exp" => "2.0 Flash (Experimental)",
+            "gemini-1.5-flash" => "1.5 Flash",
+            "gemini-1.5-flash-8b" => "1.5 Flash-8B",
+            "gemini-1.5-pro" => "1.5 Pro",
+            "gemini-1.0-pro" => "1.0 Pro (Deprecated)",
+            _ => unreachable!(),
         }
     }
 
     #[inline]
     fn change_model(
         &mut self,
-        new_model: &str,
+        new_model: String,
     ) -> Result<(), InvalidModelError> {
-        self.model = match new_model {
-            "gemini-2.0-flash-exp" => Ok(GeminiModel::Flash2_0Exp),
-            "gemini-1.5-flash" => Ok(GeminiModel::Flash1_5),
-            "gemini-1.5-flash.8b" => Ok(GeminiModel::Flash1_5_8B),
-            "gemini-1.5-pro" => Ok(GeminiModel::Pro1_5),
-            "gemini-1.0-pro" => Ok(GeminiModel::Pro1),
-            _ => Err(InvalidModelError),
-        }?;
+        if !AVAILABLE_MODELS.contains(&new_model.as_str()) {
+            return Err(InvalidModelError);
+        }
+
+        self.model = new_model;
 
         self.url = format!(
             "{GEMINI_BASE_URL}{}:streamGenerateContent?alt=sse&key={}",

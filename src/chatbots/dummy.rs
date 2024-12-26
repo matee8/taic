@@ -7,15 +7,18 @@ use crate::{Chatbot, ChatbotError, ResponseStream, Role};
 #[derive(Default)]
 pub struct DummyChatbot;
 
-impl DummyChatbot {
-    #[inline]
-    pub fn new() -> Result<Box<Self>, ChatbotError> {
-        Ok(Box::new(Self))
-    }
-}
+impl DummyChatbot {}
 
 #[async_trait]
 impl Chatbot for DummyChatbot {
+    #[inline]
+    fn create(
+        _model: String,
+        _api_key: Option<String>,
+    ) -> Result<Box<dyn Chatbot>, ChatbotError> {
+        Ok(Box::new(Self))
+    }
+
     #[inline]
     fn name(&self) -> &'static str {
         "Dummy"
@@ -29,7 +32,7 @@ impl Chatbot for DummyChatbot {
     #[inline]
     fn change_model(
         &mut self,
-        _new_model: &str,
+        _new_model: String,
     ) -> Result<(), crate::InvalidModelError> {
         Ok(())
     }
