@@ -26,6 +26,14 @@ impl Chatbot for DummyChatbot {
     }
 
     #[inline]
+    fn change_model(
+            &mut self,
+            _new_model: &str,
+        ) -> Result<(), crate::InvalidModelError> {
+        Ok(())
+    }
+
+    #[inline]
     async fn send_message(
         &self,
         messages: &[crate::Message],

@@ -41,6 +41,11 @@ impl Message {
 
 #[non_exhaustive]
 #[derive(Debug, Error)]
+#[error("Invalid model.")]
+pub struct InvalidModelError;
+
+#[non_exhaustive]
+#[derive(Debug, Error)]
 pub enum ChatbotError {
     #[error("API key missing.")]
     ApiKeyMissing(#[from] VarError),
@@ -58,6 +63,11 @@ pub trait Chatbot {
     fn name(&self) -> &'static str;
 
     fn model(&self) -> &'static str;
+
+    fn change_model(
+        &mut self,
+        new_model: &str,
+    ) -> Result<(), InvalidModelError>;
 
     fn send_message(
         &self,

@@ -44,7 +44,7 @@ async fn main() {
 // `async_trait` uses the heap which isn't the optimal solution.
 // This function instead uses static dispatch to work around those.
 async fn run_chat<C>(
-    chatbot: C,
+    mut chatbot: C,
     system_prompt: Option<String>,
     prompt: Option<String>,
     printer: &Printer,
@@ -89,7 +89,7 @@ where
         }
 
         if input.starts_with('/') {
-            handle_command(&input, &mut hist, &chatbot, printer)?;
+            handle_command(&input, &mut hist, &mut chatbot, printer)?;
         } else {
             handle_chat_message(input, &mut hist, &chatbot, printer).await?;
         }
@@ -113,7 +113,7 @@ enum ChatError {
 fn handle_command<C>(
     line: &str,
     hist: &mut Vec<Message>,
-    chatbot: &C,
+    chatbot: &mut C,
     printer: &Printer,
 ) -> Result<(), ChatError>
 where
@@ -153,6 +153,16 @@ where
                 printer.print_error_message(
                     "System prompt is required. Usage: /system <prompt>",
                 )?;
+            }
+        }
+        "/model" | "/m" => {
+            if let Some(new_model) = parts.get(1) {
+                match chatbot.change_model(new_model) {
+                    Ok(()) => printer.print_app_message(&format!("Chatbot model changed to {}", chatbot.model()))?,
+                    Err(err) => printer.print_error_message(&err.to_string())?,
+                }
+            } else {
+                printer.print_error_message("No model specified.")?;
             }
         }
         "/info" | "/i" => {

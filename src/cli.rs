@@ -34,8 +34,10 @@ impl Display for GeminiModel {
     #[inline]
     #[expect(
         clippy::min_ident_chars,
-        reason = r#"`f` is the default parameter name for `Display` trait
-                    implementation."#
+        reason = r#"
+            `f` is the default parameter name for `Display` trait 
+            implementation.
+        "#
     )]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {

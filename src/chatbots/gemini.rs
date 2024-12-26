@@ -5,7 +5,9 @@ use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::{cli::GeminiModel, Chatbot, ChatbotError, ResponseStream, Role};
+use crate::{
+    cli::GeminiModel, Chatbot, ChatbotError, InvalidModelError, ResponseStream, Role
+};
 
 const GEMINI_BASE_URL: &str =
     "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -47,6 +49,7 @@ struct GeminiResponse<'text> {
 
 #[non_exhaustive]
 pub struct GeminiChatbot {
+    api_key: String,
     url: String,
     client: Client,
     model: GeminiModel,
@@ -62,7 +65,12 @@ impl GeminiChatbot {
 
         let client = Client::new();
 
-        Ok(Self { url, client, model })
+        Ok(Self {
+            api_key,
+            url,
+            client,
+            model,
+        })
     }
 }
 
@@ -81,6 +89,28 @@ impl Chatbot for GeminiChatbot {
             GeminiModel::Pro1_5 => "1.5 Pro",
             GeminiModel::Pro1 => "1.0 Pro (Deprecated)",
         }
+    }
+
+    #[inline]
+    fn change_model(
+        &mut self,
+        new_model: &str,
+    ) -> Result<(), InvalidModelError> {
+        self.model = match new_model {
+            "gemini-2.0-flash-exp" => Ok(GeminiModel::Flash2_0Exp),
+            "gemini-1.5-flash" => Ok(GeminiModel::Flash1_5),
+            "gemini-1.5-flash.8b" => Ok(GeminiModel::Flash1_5_8B),
+            "gemini-1.5-pro" => Ok(GeminiModel::Pro1_5),
+            "gemini-1.0-pro" => Ok(GeminiModel::Pro1),
+            _ => Err(InvalidModelError),
+        }?;
+
+        self.url = format!(
+            "{GEMINI_BASE_URL}{}:streamGenerateContent?alt=sse&key={}",
+            self.model, self.api_key
+        );
+
+        Ok(())
     }
 
     #[inline]
