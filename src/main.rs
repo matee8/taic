@@ -153,6 +153,9 @@ async fn run_chat(
             continue;
         }
 
+        let user_message = Message::new(Role::User, input);
+        hist.push(user_message);
+
         handle_chat_message(&hist, &*chatbot).await?;
 
         if !io::stdin().is_terminal() {
