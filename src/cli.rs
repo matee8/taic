@@ -60,7 +60,7 @@ impl Display for GeminiModel {
 #[non_exhaustive]
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(about = "Chat with the Gemini chatbot")]
+    #[command(about = "Chat with the Google Gemini chatbot")]
     Gemini {
         #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash1_5)]
         model: GeminiModel,

@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use futures::{stream, StreamExt as _};
 
 use crate::{
-    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError, ResponseStream, Role
+    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError,
+    ResponseStream, Role,
 };
 
 const AVAILABLE_MODELS: [&str; 2] = ["1", "2"];
@@ -22,10 +23,10 @@ impl Chatbot for DummyChatbot {
         model: String,
         _api_key: Option<String>,
     ) -> Result<Box<dyn Chatbot>, ChatbotCreationError> {
-        if !AVAILABLE_MODELS.contains(&model.as_str()) {
-            Err(ChatbotCreationError::UnknownModel)
+        if AVAILABLE_MODELS.contains(&model.as_str()) {
+            Ok(Box::new(Self { model }))
         } else {
-            Ok(Box::new(Self{model}))
+            Err(ChatbotCreationError::UnknownModel)
         }
     }
 
@@ -53,11 +54,11 @@ impl Chatbot for DummyChatbot {
         &mut self,
         new_model: String,
     ) -> Result<(), InvalidModelError> {
-        if !AVAILABLE_MODELS.contains(&new_model.as_str()) {
-            Err(InvalidModelError)
-        } else {
+        if AVAILABLE_MODELS.contains(&new_model.as_str()) {
             self.model = new_model;
             Ok(())
+        } else {
+            Err(InvalidModelError)
         }
     }
 

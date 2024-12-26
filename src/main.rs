@@ -165,10 +165,19 @@ async fn run_chat(
 enum CommandError {
     #[error("{0}")]
     Io(#[from] io::Error),
+    #[error("{0}")]
+    ChatbotSwitch(#[from] ChatbotCreationError),
     #[error("User quit.")]
     Quit,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = r#"
+        Each command requires its own match arm, making further reduction
+        difficult.
+    "#
+)]
 fn handle_command(
     line: &str,
     hist: &mut Vec<Message>,
@@ -210,6 +219,36 @@ fn handle_command(
                     "System prompt is required. Usage: /system <prompt>",
                 )?;
             }
+        }
+        "/chatbot" | "/cb" => {
+            if let Some(new_chatbot) = parts.get(1) {
+                let new_chatbot = match *new_chatbot {
+                    "gemini" => GeminiChatbot::create(
+                        "gemini-1.5-flash".to_owned(),
+                        None,
+                    )?,
+                    "dummy" => DummyChatbot::create("1".to_owned(), None)?,
+                    _ => {
+                        printer.print_error_message("Invalid chatbot.")?;
+                        return Ok(());
+                    }
+                };
+
+                *chatbot = new_chatbot;
+                printer.print_app_message(&format!(
+                    "Chatbot changed to {}",
+                    chatbot.name()
+                ))?;
+            } else {
+                printer.print_error_message(
+                    "Chatbot is required. Usage: /chatbot <chatbot>",
+                )?;
+            }
+        }
+        "/list_chatbots" | "/lc" => {
+            printer.print_app_message("Available chatbots:")?;
+            printer.print_app_message("\tgemini - Google Gemini")?;
+            printer.print_app_message("\tdummy - Dummy")?;
         }
         "/model" | "/m" => {
             if let Some(new_model) = parts.get(1) {
@@ -263,12 +302,23 @@ fn handle_command(
                 "\t/system <prompt> or /s <prompt> - Set the system prompt",
             )?;
             printer.print_app_message(
+                "\t/model <model> or /m <model> - Change the chatbot model",
+            )?;
+            printer.print_app_message("\t/list_models or /lm - List all available models for current chatbot")?;
+            printer.print_app_message(
+                "\t/chatbot <chatbot> or /cb <chatbot> - Change the chatbot",
+            )?;
+            printer.print_app_message(
+                "\t/list_chatbots or /lc - List all available chatbots",
+            )?;
+            printer.print_app_message(
                 "\t/info or /i - Display current chatbot and model information",
             )?;
             printer.print_app_message(
                 "\t/help or /h - List all available commands",
             )?;
-            printer.print_app_message("\t/quit or /q - Exit the application")?;
+            printer
+                .print_app_message("\t/quit or /q - Exit the application")?;
         }
         "/quit" | "/q" => {
             printer.print_app_message("Quitting...")?;
