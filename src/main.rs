@@ -10,7 +10,7 @@ use llmcli::{
     cli::{Args, Command},
     config::{Config, ConfigLoadError},
     ui::Printer,
-    Chatbot, ChatbotError, Message, Role,
+    Chatbot, ChatbotCreationError, ChatbotError, Message, Role,
 };
 use rustyline::{error::ReadlineError, DefaultEditor};
 use thiserror::Error;
@@ -37,7 +37,7 @@ async fn main() {
     };
 
     let (chatbot, prompt): (
-        Result<Box<dyn Chatbot>, ChatbotError>,
+        Result<Box<dyn Chatbot>, ChatbotCreationError>,
         Option<String>,
     ) = match args.command {
         Some(Command::Gemini { model, prompt }) => {
@@ -52,7 +52,7 @@ async fn main() {
         Some(Command::Dummy { prompt }) => {
             (DummyChatbot::create(String::new(), None), prompt)
         }
-        Some(_) => (Err(ChatbotError::UnknownChatbot), None),
+        Some(_) => (Err(ChatbotCreationError::UnknownChatbot), None),
         None => {
             if let Some(config) = config {
                 match config.default_chatbot.as_str() {
@@ -66,10 +66,10 @@ async fn main() {
                     "dummy" => {
                         (DummyChatbot::create(String::new(), None), args.prompt)
                     }
-                    _ => (Err(ChatbotError::UnknownChatbot), None),
+                    _ => (Err(ChatbotCreationError::UnknownChatbot), None),
                 }
             } else {
-                (Err(ChatbotError::UnknownChatbot), None)
+                (Err(ChatbotCreationError::UnknownChatbot), None)
             }
         }
     };
@@ -102,8 +102,8 @@ enum ChatError {
     Readline(#[from] ReadlineError),
     #[error("{0}")]
     Chatbot(#[from] ChatbotError),
-    #[error("User quit.")]
-    Quit,
+    #[error("{0}")]
+    Command(#[from] CommandError),
 }
 
 async fn run_chat(
@@ -127,7 +127,12 @@ async fn run_chat(
             prompt
         };
 
-        handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
+        let user_message = Message::new(Role::User, input);
+        hist.push(user_message);
+
+        printer.print_chatbot_prefix(chatbot.name())?;
+
+        handle_chat_message(&hist, &*chatbot).await?;
 
         return Ok(());
     }
@@ -139,21 +144,29 @@ async fn run_chat(
     loop {
         let input = rl.readline(&user_prefix)?;
 
-        if !io::stdin().is_terminal() {
-            handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
-            break Ok(());
-        }
-
         if input.trim().is_empty() {
             continue;
         }
 
         if input.starts_with('/') {
             handle_command(&input, &mut hist, &mut chatbot, printer)?;
-        } else {
-            handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
+            continue;
+        }
+
+        handle_chat_message(&hist, &*chatbot).await?;
+
+        if !io::stdin().is_terminal() {
+            break Ok(());
         }
     }
+}
+
+#[derive(Debug, Error)]
+enum CommandError {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("User quit.")]
+    Quit,
 }
 
 fn handle_command(
@@ -161,7 +174,7 @@ fn handle_command(
     hist: &mut Vec<Message>,
     chatbot: &mut Box<dyn Chatbot>,
     printer: &Printer,
-) -> Result<(), ChatError> {
+) -> Result<(), CommandError> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     let Some(command) = parts.first() else {
         printer.print_error_message("No command specified.")?;
@@ -212,7 +225,9 @@ fn handle_command(
                     }
                 }
             } else {
-                printer.print_error_message("No model specified.")?;
+                printer.print_error_message(
+                    "Model is required. Usage: /model <model>",
+                )?;
             }
         }
         "/info" | "/i" => {
@@ -250,8 +265,8 @@ fn handle_command(
             printer.print_app_message("/quit or /q - Exit the application")?;
         }
         "/quit" | "/q" => {
-            printer.print_app_message("Exiting...")?;
-            return Err(ChatError::Quit);
+            printer.print_app_message("Quitting...")?;
+            return Err(CommandError::Quit);
         }
         _ => {
             printer.print_error_message(
@@ -264,16 +279,9 @@ fn handle_command(
 }
 
 async fn handle_chat_message(
-    prompt: String,
-    hist: &mut Vec<Message>,
+    hist: &[Message],
     chatbot: &dyn Chatbot,
-    printer: &Printer,
-) -> Result<(), ChatError> {
-    let user_message = Message::new(Role::User, prompt);
-    hist.push(user_message);
-
-    printer.print_chatbot_prefix(chatbot.name())?;
-
+) -> Result<Message, ChatError> {
     let mut full_resp = String::new();
 
     let mut stream = chatbot.send_message(hist).await?;
@@ -290,7 +298,5 @@ async fn handle_chat_message(
         }
     }
 
-    hist.push(Message::new(Role::Assistant, full_resp));
-
-    Ok(())
+    Ok(Message::new(Role::Assistant, full_resp))
 }

@@ -6,7 +6,10 @@ use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use crate::{Chatbot, ChatbotError, InvalidModelError, ResponseStream, Role};
+use crate::{
+    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError,
+    ResponseStream, Role,
+};
 
 const GEMINI_BASE_URL: &str =
     "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -68,7 +71,7 @@ impl Chatbot for GeminiChatbot {
     fn create(
         model: String,
         api_key: Option<String>,
-    ) -> Result<Box<dyn Chatbot>, ChatbotError> {
+    ) -> Result<Box<dyn Chatbot>, ChatbotCreationError> {
         let api_key = if let Some(api_key) = api_key {
             api_key
         } else {
@@ -76,7 +79,7 @@ impl Chatbot for GeminiChatbot {
         };
 
         if !AVAILABLE_MODELS.contains(&model.as_str()) {
-            return Err(ChatbotError::UnknownModel);
+            return Err(ChatbotCreationError::UnknownModel);
         }
 
         let url =

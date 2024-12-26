@@ -43,34 +43,37 @@ impl Message {
 
 #[non_exhaustive]
 #[derive(Debug, Error)]
-#[error("Invalid model.")]
-pub struct InvalidModelError;
-
-#[non_exhaustive]
-#[derive(Debug, Error)]
 pub enum ChatbotError {
-    #[error("API key missing.")]
-    ApiKeyMissing(#[from] VarError),
     #[error("Timeout.")]
     Timeout,
-    #[error("Server error.")]
-    ServerError,
     #[error("Network error: {0}.")]
     NetworkError(#[from] reqwest::Error),
     #[error("Unexpected response.")]
     UnexpectedResponse,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum ChatbotCreationError {
+    #[error("API key missing.")]
+    ApiKeyMissing(#[from] VarError),
     #[error("Unknown chatbot.")]
     UnknownChatbot,
     #[error("Unknown model.")]
     UnknownModel,
 }
 
+#[non_exhaustive]
+#[derive(Debug, Error)]
+#[error("Invalid model.")]
+pub struct InvalidModelError;
+
 #[async_trait]
 pub trait Chatbot {
     fn create(
         model: String,
         api_key: Option<String>,
-    ) -> Result<Box<dyn Chatbot>, ChatbotError>
+    ) -> Result<Box<dyn Chatbot>, ChatbotCreationError>
     where
         Self: Sized;
 

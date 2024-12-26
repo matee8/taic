@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use futures::{stream, StreamExt as _};
 
-use crate::{Chatbot, ChatbotError, ResponseStream, Role};
+use crate::{
+    Chatbot, ChatbotCreationError, ChatbotError, ResponseStream, Role,
+};
 
 #[non_exhaustive]
 #[derive(Default)]
@@ -15,7 +17,7 @@ impl Chatbot for DummyChatbot {
     fn create(
         _model: String,
         _api_key: Option<String>,
-    ) -> Result<Box<dyn Chatbot>, ChatbotError> {
+    ) -> Result<Box<dyn Chatbot>, ChatbotCreationError> {
         Ok(Box::new(Self))
     }
 
