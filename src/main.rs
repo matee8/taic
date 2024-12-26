@@ -9,6 +9,7 @@ use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, Command},
     config::{Config, ConfigLoadError},
+    session::{Session, SessionError},
     ui::Printer,
     Chatbot, ChatbotCreationError, ChatbotError, Message, Role,
 };
@@ -112,10 +113,12 @@ async fn run_chat(
     prompt: Option<String>,
     printer: &Printer,
 ) -> Result<(), ChatError> {
-    let mut hist = Vec::new();
+    let mut session = Session::new();
 
     if let Some(system_prompt) = system_prompt {
-        hist.push(Message::new(Role::System, system_prompt));
+        session
+            .messages
+            .push(Message::new(Role::System, system_prompt));
     }
 
     if let Some(prompt) = prompt {
@@ -128,11 +131,11 @@ async fn run_chat(
         };
 
         let user_message = Message::new(Role::User, input);
-        hist.push(user_message);
+        session.messages.push(user_message);
 
         printer.print_chatbot_prefix(chatbot.name())?;
 
-        handle_chat_message(&hist, &*chatbot).await?;
+        handle_chat_message(&session.messages, &*chatbot).await?;
 
         return Ok(());
     }
@@ -149,14 +152,14 @@ async fn run_chat(
         }
 
         if input.starts_with('/') {
-            handle_command(&input, &mut hist, &mut chatbot, printer)?;
+            handle_command(&input, &mut session, &mut chatbot, printer)?;
             continue;
         }
 
         let user_message = Message::new(Role::User, input);
-        hist.push(user_message);
+        session.messages.push(user_message);
 
-        handle_chat_message(&hist, &*chatbot).await?;
+        handle_chat_message(&session.messages, &*chatbot).await?;
 
         if !io::stdin().is_terminal() {
             break Ok(());
@@ -170,6 +173,8 @@ enum CommandError {
     Io(#[from] io::Error),
     #[error("{0}")]
     ChatbotSwitch(#[from] ChatbotCreationError),
+    #[error("{0}")]
+    Session(#[from] SessionError),
     #[error("User quit.")]
     Quit,
 }
@@ -183,7 +188,7 @@ enum CommandError {
 )]
 fn handle_command(
     line: &str,
-    hist: &mut Vec<Message>,
+    session: &mut Session,
     chatbot: &mut Box<dyn Chatbot>,
     printer: &Printer,
 ) -> Result<(), CommandError> {
@@ -195,10 +200,10 @@ fn handle_command(
 
     match *command {
         "/clear" | "/c" => {
-            hist.clear();
+            session.messages.clear();
             printer.print_app_message("Context cleared.")?;
         }
-        "/system" | "/s" => {
+        "/system" | "/sys" => {
             if parts.len() > 1 {
                 #[expect(
                     clippy::indexing_slicing,
@@ -209,13 +214,8 @@ fn handle_command(
                     "#
                 )]
                 let new_msg = Message::new(Role::System, parts[1..].join(" "));
-                if let Some(first) = hist.first_mut() {
-                    if first.role == Role::System {
-                        *first = new_msg;
-                    }
-                } else {
-                    hist.insert(0, new_msg);
-                }
+                session.messages.retain(|msg| msg.role != Role::System);
+                session.messages.insert(0, new_msg);
                 printer.print_app_message("System prompt set.")?;
             } else {
                 printer.print_error_message(
@@ -288,7 +288,7 @@ fn handle_command(
                 chatbot.model()
             ))?;
             if let &Some(system_msg) =
-                &hist.iter().find(|msg| msg.role == Role::System)
+                &session.messages.iter().find(|msg| msg.role == Role::System)
             {
                 printer.print_app_message(&format!(
                     "System prompt: {}",
@@ -302,12 +302,8 @@ fn handle_command(
                 "\t/clear or /c - Clear the conversation history (including system prompt)",
             )?;
             printer.print_app_message(
-                "\t/system <prompt> or /s <prompt> - Set the system prompt",
+                "\t/system <prompt> or /sys <prompt> - Set the system prompt",
             )?;
-            printer.print_app_message(
-                "\t/model <model> or /m <model> - Change the chatbot model",
-            )?;
-            printer.print_app_message("\t/list_models or /lm - List all available models for current chatbot")?;
             printer.print_app_message(
                 "\t/chatbot <chatbot> or /cb <chatbot> - Change the chatbot",
             )?;
@@ -315,13 +311,80 @@ fn handle_command(
                 "\t/list_chatbots or /lc - List all available chatbots",
             )?;
             printer.print_app_message(
+                "\t/model <model> or /m <model> - Change the chatbot model",
+            )?;
+            printer.print_app_message("\t/list_models or /lm - List all available models for current chatbot")?;
+            printer.print_app_message(
                 "\t/info or /i - Display current chatbot and model information",
+            )?;
+            printer.print_app_message(
+                "\t/save <filename> or /s <filename> - Save the session",
+            )?;
+            printer.print_app_message(
+                "\t/load <filename> or /l <filename> - Load a saved session",
+            )?;
+            printer.print_app_message(
+                "\t/delete <filename> or /d - Delete a session",
+            )?;
+            printer.print_app_message(
+                "\t/sessions or /se - List all saved session",
+            )?;
+            printer.print_app_message(
+                "\t/delete <filename> or /d - Delete a session",
             )?;
             printer.print_app_message(
                 "\t/help or /h - List all available commands",
             )?;
             printer
                 .print_app_message("\t/quit or /q - Exit the application")?;
+        }
+        "/save" | "/s" => {
+            if let Some(filename) = parts.get(1) {
+                session.save(filename)?;
+                printer.print_app_message(&format!(
+                    "Session saved to {filename}.json"
+                ))?;
+            } else {
+                printer.print_error_message(
+                    "Filename is required. Usage: /save <filename>",
+                )?;
+            }
+        }
+        "/load" | "/l" => {
+            if let Some(filename) = parts.get(1) {
+                let loaded_session = Session::load(filename)?;
+                *session = loaded_session;
+                printer.print_app_message(&format!(
+                    "Session loaded from {filename}.json"
+                ))?;
+            } else {
+                printer.print_error_message(
+                    "Filename is required. Usage: /load <filename>",
+                )?;
+            }
+        }
+        "/sessions" | "/se" => {
+            let sessions = Session::list_all()?;
+            if sessions.is_empty() {
+                printer.print_error_message("No saved sessions found.")?;
+            } else {
+                printer.print_app_message("Saved sessions:")?;
+                for elem in sessions {
+                    printer.print_app_message(&format!("\t{elem}"))?;
+                }
+            }
+        }
+        "/delete" | "/d" => {
+            if let Some(filename) = parts.get(1) {
+                Session::delete(filename)?;
+                printer.print_app_message(&format!(
+                    "Session {filename}.json deleted."
+                ))?;
+            } else {
+                printer.print_error_message(
+                    "Filename is required. Usage: /delete <filename>",
+                )?;
+            }
         }
         "/quit" | "/q" => {
             printer.print_app_message("Quitting...")?;

@@ -12,6 +12,7 @@ use thiserror::Error;
 pub mod chatbots;
 pub mod cli;
 pub mod config;
+pub mod session;
 pub mod ui;
 
 type ResponseStream =
@@ -28,6 +29,7 @@ pub enum Role {
 }
 
 #[non_exhaustive]
+#[derive(Serialize, Deserialize)]
 pub struct Message {
     pub role: Role,
     pub content: String,
@@ -93,5 +95,3 @@ pub trait Chatbot {
         messages: &[Message],
     ) -> Result<ResponseStream, ChatbotError>;
 }
-
-pub trait Model {}

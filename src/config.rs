@@ -49,27 +49,6 @@ pub enum ConfigSaveError {
 }
 
 impl Config {
-    fn get_file_path() -> io::Result<PathBuf> {
-        if let Ok(config_path) = env::var("LLMCLI_CONFIG_PATH") {
-            return Ok(PathBuf::from(config_path));
-        }
-
-        if let Some(config_dir) = dirs::config_dir() {
-            let config_path = config_dir.join("llmcli/config.toml");
-            if let Some(parent) = config_path.parent() {
-                if !parent.exists() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            return Ok(config_path);
-        }
-
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "Config directory not found",
-        ))
-    }
-
     #[inline]
     pub fn load(config_path: Option<PathBuf>) -> Result<Self, ConfigLoadError> {
         let config_path = if let Some(config_path) = config_path {
@@ -94,5 +73,26 @@ impl Config {
         let config_str = toml::to_string(self)?;
         fs::write(config_path, config_str)?;
         Ok(())
+    }
+
+    fn get_file_path() -> io::Result<PathBuf> {
+        if let Ok(config_path) = env::var("LLMCLI_CONFIG_PATH") {
+            return Ok(PathBuf::from(config_path));
+        }
+
+        if let Some(config_dir) = dirs::config_dir() {
+            let config_path = config_dir.join("llmcli/config.toml");
+            if let Some(parent) = config_path.parent() {
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
+            return Ok(config_path);
+        }
+
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Config directory not found",
+        ))
     }
 }
