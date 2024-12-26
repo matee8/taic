@@ -57,9 +57,9 @@ struct GeminiResponse<'text> {
 #[non_exhaustive]
 pub struct GeminiChatbot {
     api_key: String,
+    model: String,
     url: String,
     client: Client,
-    model: String,
 }
 
 #[async_trait]
@@ -86,9 +86,9 @@ impl Chatbot for GeminiChatbot {
 
         Ok(Box::new(Self {
             api_key,
+            model,
             url,
             client,
-            model,
         }))
     }
 
@@ -100,7 +100,7 @@ impl Chatbot for GeminiChatbot {
     #[inline]
     fn model(&self) -> &'static str {
         #[expect(
-            clippy::unreachable, 
+            clippy::unreachable,
             reason = r#"
                 `model` is validated on initialization and in `change_model`,
                 so it should always be a valid name.

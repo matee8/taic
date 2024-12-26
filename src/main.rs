@@ -47,32 +47,25 @@ async fn main() {
                 None
             };
 
-            match GeminiChatbot::create(model.to_string(), api_key) {
-                Ok(chatbot) => (Ok(chatbot), prompt),
-                Err(err) => (Err(err), prompt),
-            }
+            (GeminiChatbot::create(model.to_string(), api_key), prompt)
         }
-        Some(Command::Dummy { prompt }) => match DummyChatbot::create(String::new(), None) {
-            Ok(chatbot) => (Ok(chatbot), prompt),
-            Err(err) => (Err(err), prompt),
-        },
+        Some(Command::Dummy { prompt }) => {
+            (DummyChatbot::create(String::new(), None), prompt)
+        }
         Some(_) => (Err(ChatbotError::UnknownChatbot), None),
         None => {
             if let Some(config) = config {
-                match config.default_chatbot.as_ref() {
-                    "gemini" => {
-                        match GeminiChatbot::create(
+                match config.default_chatbot.as_str() {
+                    "gemini" => (
+                        GeminiChatbot::create(
                             config.default_model,
                             config.api_keys.gemini,
-                        ) {
-                            Ok(chatbot) => (Ok(chatbot), args.prompt),
-                            Err(err) => (Err(err), args.prompt),
-                        }
+                        ),
+                        args.prompt,
+                    ),
+                    "dummy" => {
+                        (DummyChatbot::create(String::new(), None), args.prompt)
                     }
-                    "dummy" => match DummyChatbot::create(String::new(), None) {
-                        Ok(chatbot) => (Ok(chatbot), args.prompt),
-                        Err(err) => (Err(err), args.prompt),
-                    },
                     _ => (Err(ChatbotError::UnknownChatbot), None),
                 }
             } else {
@@ -101,9 +94,18 @@ async fn main() {
     }
 }
 
-// Traits with `async fn` have limitations using dynamic dispatch.
-// `async_trait` uses the heap which isn't the optimal solution.
-// This function instead uses static dispatch to work around those.
+#[derive(Debug, Error)]
+enum ChatError {
+    #[error("Input/output error.")]
+    Io(#[from] io::Error),
+    #[error("{0}.")]
+    Readline(#[from] ReadlineError),
+    #[error("{0}")]
+    Chatbot(#[from] ChatbotError),
+    #[error("User quit.")]
+    Quit,
+}
+
 async fn run_chat(
     mut chatbot: Box<dyn Chatbot>,
     system_prompt: Option<String>,
@@ -152,20 +154,6 @@ async fn run_chat(
             handle_chat_message(input, &mut hist, &*chatbot, printer).await?;
         }
     }
-}
-
-#[derive(Debug, Error)]
-enum ChatError {
-    #[error("Input/output error.")]
-    Io(#[from] io::Error),
-    #[error("{0}.")]
-    Readline(#[from] ReadlineError),
-    #[error("{0}")]
-    Chatbot(#[from] ChatbotError),
-    #[error("Unkown chatbot.")]
-    UnknownChatbot,
-    #[error("User quit.")]
-    Quit,
 }
 
 fn handle_command(
