@@ -1,4 +1,4 @@
-use std::{io, process};
+use std::{io::{self, IsTerminal}, process};
 
 use clap::Parser as _;
 use crossterm::style::{
@@ -56,6 +56,11 @@ where
 
     loop {
         let prompt = rl.readline(&input_prompt)?;
+
+        if !io::stdin().is_terminal() {
+            handle_chat_message(prompt, &mut hist, &chatbot).await?;
+            break Ok(());
+        }
 
         if prompt.trim().is_empty() {
             continue;
