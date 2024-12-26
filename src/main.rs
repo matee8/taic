@@ -1,4 +1,7 @@
-use std::{io::{self, IsTerminal}, process};
+use std::{
+    io::{self, IsTerminal as _, Read as _},
+    process,
+};
 
 use clap::Parser as _;
 use crossterm::style::{
@@ -18,12 +21,12 @@ async fn main() {
     let args = Args::parse();
 
     if let Err(err) = match args.command {
-        Command::Gemini { model } => match GeminiChatbot::new(&model) {
-            Ok(chatbot) => run_chat(chatbot, args.system_prompt).await,
+        Command::Gemini { model, prompt } => match GeminiChatbot::new(&model) {
+            Ok(chatbot) => run_chat(chatbot, args.system_prompt, prompt).await,
             Err(err) => Err(err.into()),
         },
-        Command::Dummy => {
-            run_chat(DummyChatbot::new(), args.system_prompt).await
+        Command::Dummy {prompt}=> {
+            run_chat(DummyChatbot::new(), args.system_prompt, prompt).await
         }
         _ => Err(ChatError::UnknownChatbot),
     } {
@@ -40,14 +43,29 @@ async fn main() {
 async fn run_chat<C>(
     chatbot: C,
     system_prompt: Option<String>,
+    prompt: Option<String>,
 ) -> Result<(), ChatError>
 where
     C: Chatbot + Send + Sync,
 {
     let mut hist = Vec::new();
 
-    if let Some(prompt) = system_prompt {
-        hist.push(Message::new(Role::System, prompt));
+    if let Some(system_prompt) = system_prompt {
+        hist.push(Message::new(Role::System, system_prompt));
+    }
+
+    if let Some(prompt) = prompt {
+        let input = if prompt == "-" {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input)?;
+            input
+        } else {
+            prompt
+        };
+
+        handle_chat_message(input, &mut hist, &chatbot).await?;
+
+        return Ok(());
     }
 
     let mut rl = DefaultEditor::new()?;
@@ -55,21 +73,21 @@ where
     let input_prompt = get_input_prompt();
 
     loop {
-        let prompt = rl.readline(&input_prompt)?;
+        let input = rl.readline(&input_prompt)?;
 
         if !io::stdin().is_terminal() {
-            handle_chat_message(prompt, &mut hist, &chatbot).await?;
+            handle_chat_message(input, &mut hist, &chatbot).await?;
             break Ok(());
         }
 
-        if prompt.trim().is_empty() {
+        if input.trim().is_empty() {
             continue;
         }
 
-        if prompt.starts_with('/') {
-            handle_command(&prompt, &mut hist, &chatbot)?;
+        if input.starts_with('/') {
+            handle_command(&input, &mut hist, &chatbot)?;
         } else {
-            handle_chat_message(prompt, &mut hist, &chatbot).await?;
+            handle_chat_message(input, &mut hist, &chatbot).await?;
         }
     }
 }
@@ -188,9 +206,13 @@ where
     Ok(())
 }
 
-async fn handle_chat_message<C>(line: String, hist: &mut Vec<Message>, chatbot: &C) -> Result<(), ChatError> 
+async fn handle_chat_message<C>(
+    line: String,
+    hist: &mut Vec<Message>,
+    chatbot: &C,
+) -> Result<(), ChatError>
 where
-    C: Chatbot + Send + Sync
+    C: Chatbot + Send + Sync,
 {
     let user_message = Message::new(Role::User, line);
     hist.push(user_message);
@@ -217,4 +239,3 @@ where
 
     Ok(())
 }
-

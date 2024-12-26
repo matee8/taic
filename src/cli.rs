@@ -41,7 +41,16 @@ pub enum Command {
     Gemini {
         #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash)]
         model: GeminiModel,
+        #[arg(
+            help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode)"
+        )]
+        prompt: Option<String>,
     },
     #[command(about = "Chat with the Dummy chatbot")]
-    Dummy,
+    Dummy {
+        #[arg(
+            help = "Input prompt (optional, no prompt starts interactive mode and reads from stdin)"
+        )]
+        prompt: Option<String>,
+    },
 }
