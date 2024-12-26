@@ -7,6 +7,22 @@ use crossterm::{
     },
 };
 
+// Cannot be a `const fn` because we apply ANSI escape codes for colors based
+// on terminal capabilities, which are determined at runtime.
+// Using `crossterm` functions directly within a const str is also
+// not possible as they are not `const fn` compatible.
+#[inline]
+#[must_use]
+pub fn get_input_prompt() -> String {
+    format!(
+        "{}{}You: {}{}",
+        SetForegroundColor(Color::Magenta),
+        SetAttribute(Attribute::Bold),
+        ResetColor,
+        SetAttribute(Attribute::Reset)
+    )
+}
+
 #[inline]
 pub fn print_app_message(message: &str) -> io::Result<()> {
     execute!(
@@ -22,7 +38,7 @@ pub fn print_app_message(message: &str) -> io::Result<()> {
 }
 
 #[inline]
-pub fn print_chatbot_message(name: &str) -> io::Result<()> {
+pub fn print_chatbot_prompt(name: &str) -> io::Result<()> {
     execute!(
         io::stdout(),
         SetForegroundColor(Color::Cyan),

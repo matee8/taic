@@ -4,9 +4,6 @@ use std::{
 };
 
 use clap::Parser as _;
-use crossterm::style::{
-    Attribute, Color, ResetColor, SetAttribute, SetForegroundColor,
-};
 use futures::StreamExt as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
@@ -70,7 +67,7 @@ where
 
     let mut rl = DefaultEditor::new()?;
 
-    let input_prompt = get_input_prompt();
+    let input_prompt = ui::get_input_prompt();
 
     loop {
         let input = rl.readline(&input_prompt)?;
@@ -90,20 +87,6 @@ where
             handle_chat_message(input, &mut hist, &chatbot).await?;
         }
     }
-}
-
-// Cannot be a `const fn` because we apply ANSI escape codes for colors based
-// on terminal capabilities, which are determined at runtime.
-// Using `crossterm` functions directly within a const str is also
-// not possible as they are not `const fn` compatible.
-fn get_input_prompt() -> String {
-    format!(
-        "{}{}You: {}{}",
-        SetForegroundColor(Color::Magenta),
-        SetAttribute(Attribute::Bold),
-        ResetColor,
-        SetAttribute(Attribute::Reset)
-    )
 }
 
 #[derive(Debug, Error)]
@@ -217,7 +200,7 @@ where
     let user_message = Message::new(Role::User, line);
     hist.push(user_message);
 
-    ui::print_chatbot_message(chatbot.name())?;
+    ui::print_chatbot_prompt(chatbot.name())?;
 
     let mut full_resp = String::new();
 
