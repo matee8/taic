@@ -98,11 +98,11 @@ impl Session {
     }
 
     fn get_dir_path() -> Result<PathBuf, SessionError> {
-        let session_dir = if let Ok(env_dir) = env::var("LLMCLI_HISTORY_DIR") {
+        let session_dir = if let Ok(env_dir) = env::var("LLMCLI_SESSION_DIR") {
             PathBuf::from(env_dir)
         } else {
             let data_dir = dirs::data_dir().ok_or(SessionError::DataDir)?;
-            data_dir.join("llmcli_history")
+            data_dir.join("llmcli_sessions")
         };
 
         if !session_dir.exists() {

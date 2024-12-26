@@ -1,5 +1,8 @@
 use std::{
+    env,
+    fs::File,
     io::{self, ErrorKind, IsTerminal as _, Read as _},
+    path::PathBuf,
     process,
 };
 
@@ -19,7 +22,6 @@ use thiserror::Error;
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-
     let printer = Printer::new(args.no_color);
 
     let config = match Config::load(args.config) {
@@ -30,6 +32,15 @@ async fn main() {
             None
         }
         Err(err) => {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = r#"
+                    We are exiting immediately after printing the error message,
+                    so we don't need to handle a potential error.
+                    The `unwrap_or_else` is only used to log the error to stderr
+                    in case of `print_error_message` failure.
+                "#
+            )]
             let _: Result<(), ()> = printer
                 .print_error_message(&err.to_string())
                 .map_err(|err| {
@@ -49,7 +60,6 @@ async fn main() {
             } else {
                 None
             };
-
             (GeminiChatbot::create(model.to_string(), api_key), prompt)
         }
         Some(Command::Dummy { prompt }) => {
@@ -80,6 +90,12 @@ async fn main() {
     let chatbot = match chatbot {
         Ok(chatbot) => chatbot,
         Err(err) => {
+            #[expect(
+                clippy::let_underscore_must_use,
+                reason = r#"
+                    See the one above this.
+                "#
+            )]
             let _: Result<(), ()> = printer
                 .print_error_message(&err.to_string())
                 .map_err(|err| {
@@ -92,6 +108,12 @@ async fn main() {
     if let Err(err) =
         run_chat(chatbot, args.system_prompt, prompt, &printer).await
     {
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = r#"
+                See the one above this.
+            "#
+        )]
         let _: Result<(), ()> = printer
             .print_error_message(&err.to_string())
             .map_err(|err| {
@@ -132,7 +154,9 @@ async fn run_chat(
     if let Some(prompt) = prompt {
         let input = if prompt == "-" {
             let mut input = String::new();
-            io::stdin().read_to_string(&mut input).map_err(ChatError::Read)?;
+            io::stdin()
+                .read_to_string(&mut input)
+                .map_err(ChatError::Read)?;
             input
         } else {
             prompt
@@ -141,7 +165,9 @@ async fn run_chat(
         let user_message = Message::new(Role::User, input);
         session.messages.push(user_message);
 
-        printer.print_chatbot_prefix(chatbot.name()).map_err(ChatError::Print)?;
+        printer
+            .print_chatbot_prefix(chatbot.name())
+            .map_err(ChatError::Print)?;
 
         handle_chat_message(&session.messages, &*chatbot).await?;
 
@@ -150,17 +176,80 @@ async fn run_chat(
 
     let mut rl = DefaultEditor::new()?;
 
+    let history_file = if let Ok(path) = env::var("LLMCLI_HISTORY_FILE") {
+        if let Err(err) = rl.load_history(&path) {
+            printer
+                .print_error_message(&format!(
+                    "Failed to load history from file ({path:?}): {err}"
+                ))
+                .map_err(ChatError::Print)?;
+        }
+        Some(PathBuf::from(path))
+    } else if let Some(mut path) = dirs::cache_dir() {
+        path.push("llmcli_history.txt");
+        if !path.exists() {
+            if let Err(err) = File::create(&path) {
+                printer
+                    .print_error_message(&format!(
+                        "Failed to create history file ({path:?}): {err}"
+                    ))
+                    .map_err(ChatError::Print)?;
+            };
+        }
+        if let Err(err) = rl.load_history(&path) {
+            printer
+                .print_error_message(&format!(
+                    "Failed to load history from file ({path:?}): {err}"
+                ))
+                .map_err(ChatError::Print)?;
+        }
+        Some(path)
+    } else {
+        printer
+            .print_error_message("Failed to find cache directory for history.")
+            .map_err(ChatError::Print)?;
+        None
+    };
+
     let user_prefix = printer.get_user_prefix();
 
     loop {
-        let input = rl.readline(&user_prefix)?;
+        let input = match rl.readline(&user_prefix) {
+            Ok(line) => Ok(line),
+            Err(err) => {
+                if matches!(err, ReadlineError::Interrupted) {
+                    if let Some(ref history_file) = history_file {
+                        if let Err(err) = rl.save_history(history_file) {
+                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): {err}.")).map_err(ChatError::Print)?;
+                        }
+                    } else {
+                        printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): No history file specified.")).map_err(ChatError::Print)?;
+                    }
+                }
+                Err(err)
+            }
+        }?;
 
         if input.trim().is_empty() {
             continue;
         }
 
         if input.starts_with('/') {
-            handle_command(&input, &mut session, &mut chatbot, printer)?;
+            if let Err(err) =
+                handle_command(&input, &mut session, &mut chatbot, printer)
+            {
+                if matches!(err, CommandError::Quit) {
+                    if let Some(ref history_file) = history_file {
+                        if let Err(err) = rl.save_history(history_file) {
+                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): {err}")).map_err(ChatError::Print)?;
+                        } else {
+                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): No history file specified.")).map_err(ChatError::Print)?;
+                        }
+                    }
+                }
+                return Err(err.into());
+            };
+            rl.add_history_entry(input.as_str())?;
             continue;
         }
 
@@ -187,13 +276,6 @@ enum CommandError {
     Quit,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = r#"
-        Each command requires its own match arm, making further reduction
-        difficult.
-    "#
-)]
 fn handle_command(
     line: &str,
     session: &mut Session,
