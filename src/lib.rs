@@ -57,6 +57,8 @@ pub enum ChatbotError {
 pub trait Chatbot {
     fn name(&self) -> &'static str;
 
+    fn model(&self) -> &'static str;
+
     fn send_message(
         &self,
         messages: &[Message],

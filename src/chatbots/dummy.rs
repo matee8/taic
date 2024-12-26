@@ -21,6 +21,11 @@ impl Chatbot for DummyChatbot {
     }
 
     #[inline]
+    fn model(&self) -> &'static str {
+        "1"
+    }
+
+    #[inline]
     async fn send_message(
         &self,
         messages: &[crate::Message],

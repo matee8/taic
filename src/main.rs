@@ -21,7 +21,7 @@ async fn main() {
     let printer = Printer::new(args.no_color);
 
     if let Err(err) = match args.command {
-        Command::Gemini { model, prompt } => match GeminiChatbot::new(&model) {
+        Command::Gemini { model, prompt } => match GeminiChatbot::new(model) {
             Ok(chatbot) => {
                 run_chat(chatbot, args.system_prompt, prompt, &printer).await
             }
@@ -160,6 +160,7 @@ where
                 "Current chatbot: {}",
                 chatbot.name()
             ))?;
+            printer.print_app_message(&format!("Current model: {}", chatbot.model()))?;
             if let &Some(system_msg) =
                 &hist.iter().find(|msg| msg.role == Role::System)
             {

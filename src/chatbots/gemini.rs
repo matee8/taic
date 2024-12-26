@@ -49,11 +49,12 @@ struct GeminiResponse<'text> {
 pub struct GeminiChatbot {
     url: String,
     client: Client,
+    model: GeminiModel,
 }
 
 impl GeminiChatbot {
     #[inline]
-    pub fn new(model: &GeminiModel) -> Result<Self, ChatbotError> {
+    pub fn new(model: GeminiModel) -> Result<Self, ChatbotError> {
         let api_key = env::var("GEMINI_API_KEY")?;
 
         let url =
@@ -61,7 +62,7 @@ impl GeminiChatbot {
 
         let client = Client::new();
 
-        Ok(Self { url, client })
+        Ok(Self { url, client, model })
     }
 }
 
@@ -69,6 +70,13 @@ impl Chatbot for GeminiChatbot {
     #[inline]
     fn name(&self) -> &'static str {
         "Gemini"
+    }
+
+    #[inline]
+    fn model(&self) -> &'static str {
+        match self.model {
+            GeminiModel::Flash1_5 => "1.5-flash"
+        }
     }
 
     #[inline]

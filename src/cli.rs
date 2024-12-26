@@ -19,7 +19,7 @@ pub struct Args {
 #[derive(Debug, Clone, ValueEnum)]
 pub enum GeminiModel {
     #[clap(name = "gemini-1.5-flash")]
-    Flash,
+    Flash1_5,
 }
 
 impl Display for GeminiModel {
@@ -31,7 +31,7 @@ impl Display for GeminiModel {
     )]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            &Self::Flash => writeln!(f, "gemini-1.5-flash"),
+            &Self::Flash1_5 => writeln!(f, "gemini-1.5-flash"),
         }
     }
 }
@@ -41,7 +41,7 @@ impl Display for GeminiModel {
 pub enum Command {
     #[command(about = "Chat with the Gemini chatbot")]
     Gemini {
-        #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash)]
+        #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash1_5)]
         model: GeminiModel,
         #[arg(
             help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode)"
