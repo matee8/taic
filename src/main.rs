@@ -230,6 +230,12 @@ fn handle_command(
                 )?;
             }
         }
+        "/list_models" | "/lm" => {
+            printer.print_app_message("Available models:")?;
+            for model in chatbot.available_models() {
+                printer.print_app_message(&format!("\t{model}"))?;
+            }
+        }
         "/info" | "/i" => {
             printer.print_app_message(&format!(
                 "Current chatbot: {}",
@@ -251,18 +257,18 @@ fn handle_command(
         "/help" | "/h" => {
             printer.print_app_message("Available commands:")?;
             printer.print_app_message(
-                "/clear or /c - Clear the conversation history (including system prompt)",
+                "\t/clear or /c - Clear the conversation history (including system prompt)",
             )?;
             printer.print_app_message(
-                "/system <prompt> or /s <prompt> - Set the system prompt",
+                "\t/system <prompt> or /s <prompt> - Set the system prompt",
             )?;
             printer.print_app_message(
-                "/info or /i - Display current chatbot and model information",
+                "\t/info or /i - Display current chatbot and model information",
             )?;
             printer.print_app_message(
-                "/help or /h - List all available commands",
+                "\t/help or /h - List all available commands",
             )?;
-            printer.print_app_message("/quit or /q - Exit the application")?;
+            printer.print_app_message("\t/quit or /q - Exit the application")?;
         }
         "/quit" | "/q" => {
             printer.print_app_message("Quitting...")?;

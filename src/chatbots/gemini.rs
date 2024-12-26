@@ -119,6 +119,10 @@ impl Chatbot for GeminiChatbot {
         }
     }
 
+    fn available_models(&self) -> &[&str] {
+        &AVAILABLE_MODELS
+    }
+
     #[inline]
     fn change_model(
         &mut self,

@@ -2,12 +2,16 @@ use async_trait::async_trait;
 use futures::{stream, StreamExt as _};
 
 use crate::{
-    Chatbot, ChatbotCreationError, ChatbotError, ResponseStream, Role,
+    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError, ResponseStream, Role
 };
+
+const AVAILABLE_MODELS: [&str; 2] = ["1", "2"];
 
 #[non_exhaustive]
 #[derive(Default)]
-pub struct DummyChatbot;
+pub struct DummyChatbot {
+    model: String,
+}
 
 impl DummyChatbot {}
 
@@ -15,10 +19,14 @@ impl DummyChatbot {}
 impl Chatbot for DummyChatbot {
     #[inline]
     fn create(
-        _model: String,
+        model: String,
         _api_key: Option<String>,
     ) -> Result<Box<dyn Chatbot>, ChatbotCreationError> {
-        Ok(Box::new(Self))
+        if !AVAILABLE_MODELS.contains(&model.as_str()) {
+            Err(ChatbotCreationError::UnknownModel)
+        } else {
+            Ok(Box::new(Self{model}))
+        }
     }
 
     #[inline]
@@ -28,15 +36,29 @@ impl Chatbot for DummyChatbot {
 
     #[inline]
     fn model(&self) -> &'static str {
-        "1"
+        match self.model.as_str() {
+            "1" => "Model 1",
+            "2" => "Model 2",
+            _ => "Invalid Model",
+        }
+    }
+
+    #[inline]
+    fn available_models(&self) -> &[&str] {
+        &AVAILABLE_MODELS
     }
 
     #[inline]
     fn change_model(
         &mut self,
-        _new_model: String,
-    ) -> Result<(), crate::InvalidModelError> {
-        Ok(())
+        new_model: String,
+    ) -> Result<(), InvalidModelError> {
+        if !AVAILABLE_MODELS.contains(&new_model.as_str()) {
+            Err(InvalidModelError)
+        } else {
+            self.model = new_model;
+            Ok(())
+        }
     }
 
     #[inline]

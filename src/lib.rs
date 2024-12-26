@@ -81,6 +81,8 @@ pub trait Chatbot {
 
     fn model(&self) -> &'static str;
 
+    fn available_models(&self) -> &[&str];
+
     fn change_model(
         &mut self,
         new_model: String,
