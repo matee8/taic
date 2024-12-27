@@ -220,10 +220,19 @@ async fn run_chat(
                 if matches!(err, ReadlineError::Interrupted) {
                     if let Some(ref history_file) = history_file {
                         if let Err(err) = rl.save_history(history_file) {
-                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): {err}.")).map_err(ChatError::Print)?;
+                            printer.print_error_message(
+                                &format!(
+                                    "Failed to save history to file ({history_file:?}): {err}."
+                                )
+                            )
+                            .map_err(ChatError::Print)?;
                         }
                     } else {
-                        printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): No history file specified.")).map_err(ChatError::Print)?;
+                        printer.print_error_message(
+                            &format!(
+                                "Failed to save history to file ({history_file:?}): No history file specified."
+                            )
+                        ).map_err(ChatError::Print)?;
                     }
                 }
                 Err(err)
@@ -241,9 +250,17 @@ async fn run_chat(
                 if matches!(err, CommandError::Quit) {
                     if let Some(ref history_file) = history_file {
                         if let Err(err) = rl.save_history(history_file) {
-                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): {err}")).map_err(ChatError::Print)?;
+                            printer.print_error_message(
+                                &format!(
+                                    "Failed to save history to file ({history_file:?}): {err}"
+                                )
+                            ).map_err(ChatError::Print)?;
                         } else {
-                            printer.print_error_message(&format!("Failed to save history to file ({history_file:?}): No history file specified.")).map_err(ChatError::Print)?;
+                            printer.print_error_message(
+                                &format!(
+                                    "Failed to save history to file ({history_file:?}): No history file specified."
+                                )
+                            ).map_err(ChatError::Print)?;
                         }
                     }
                 }
@@ -255,6 +272,10 @@ async fn run_chat(
 
         let user_message = Message::new(Role::User, input);
         session.messages.push(user_message);
+
+        printer
+            .print_chatbot_prefix(chatbot.name())
+            .map_err(ChatError::Print)?;
 
         handle_chat_message(&session.messages, &*chatbot).await?;
 
@@ -403,7 +424,9 @@ fn handle_command(
             printer.print_app_message(
                 "\t/model <model> or /m <model> - Change the chatbot model",
             )?;
-            printer.print_app_message("\t/list_models or /lm - List all available models for current chatbot")?;
+            printer.print_app_message(
+                "\t/list_models or /lm - List all available models for current chatbot"
+            )?;
             printer.print_app_message(
                 "\t/info or /i - Display current chatbot and model information",
             )?;
