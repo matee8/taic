@@ -19,7 +19,7 @@ type ResponseStream =
     Pin<Box<dyn Stream<Item = Result<String, ChatbotError>> + Send + 'static>>;
 
 #[non_exhaustive]
-#[derive(PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     System,
@@ -29,7 +29,7 @@ pub enum Role {
 }
 
 #[non_exhaustive]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub role: Role,
     pub content: String,

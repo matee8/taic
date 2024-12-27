@@ -277,7 +277,9 @@ async fn run_chat(
             .print_chatbot_prefix(chatbot.name())
             .map_err(ChatError::Print)?;
 
-        handle_chat_message(&session.messages, &*chatbot).await?;
+        let assistant_message = handle_chat_message(&session.messages, &*chatbot).await?;
+
+        session.messages.push(assistant_message);
 
         if !io::stdin().is_terminal() {
             break Ok(());
