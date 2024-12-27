@@ -55,11 +55,9 @@ async fn main() {
         Option<String>,
     ) = match args.command {
         Some(Command::Gemini { model, prompt }) => {
-            let api_key = if let Some(config) = config {
-                config.api_keys.gemini
-            } else {
-                None
-            };
+            let api_key = config
+                .as_ref()
+                .and_then(|config| config.api_keys.gemini.clone());
             (GeminiChatbot::create(model.to_string(), api_key), prompt)
         }
         Some(Command::Dummy { prompt }) => {
@@ -67,12 +65,12 @@ async fn main() {
         }
         Some(_) => (Err(ChatbotCreationError::UnknownChatbot), None),
         None => {
-            if let Some(config) = config {
+            if let Some(ref config) = config {
                 match config.default_chatbot.as_str() {
                     "gemini" => (
                         GeminiChatbot::create(
-                            config.default_model,
-                            config.api_keys.gemini,
+                            config.default_model.clone(),
+                            config.api_keys.gemini.clone(),
                         ),
                         args.prompt,
                     ),
@@ -106,7 +104,7 @@ async fn main() {
     };
 
     if let Err(err) =
-        run_chat(chatbot, args.system_prompt, prompt, &printer).await
+        run_chat(chatbot, args.system_prompt, prompt, &printer, config).await
     {
         #[expect(
             clippy::let_underscore_must_use,
@@ -142,6 +140,7 @@ async fn run_chat(
     system_prompt: Option<String>,
     prompt: Option<String>,
     printer: &Printer,
+    config: Option<Config>,
 ) -> Result<(), ChatError> {
     let mut session = Session::new();
 
@@ -244,9 +243,13 @@ async fn run_chat(
         }
 
         if input.starts_with('/') {
-            if let Err(err) =
-                handle_command(&input, &mut session, &mut chatbot, printer)
-            {
+            if let Err(err) = handle_command(
+                &input,
+                &mut session,
+                &mut chatbot,
+                printer,
+                config.as_ref(),
+            ) {
                 if matches!(err, CommandError::Quit) {
                     if let Some(ref history_file) = history_file {
                         if let Err(err) = rl.save_history(history_file) {
@@ -277,7 +280,8 @@ async fn run_chat(
             .print_chatbot_prefix(chatbot.name())
             .map_err(ChatError::Print)?;
 
-        let assistant_message = handle_chat_message(&session.messages, &*chatbot).await?;
+        let assistant_message =
+            handle_chat_message(&session.messages, &*chatbot).await?;
 
         session.messages.push(assistant_message);
 
@@ -304,6 +308,7 @@ fn handle_command(
     session: &mut Session,
     chatbot: &mut Box<dyn Chatbot>,
     printer: &Printer,
+    config: Option<&Config>,
 ) -> Result<(), CommandError> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     let Some(command) = parts.first() else {
@@ -339,10 +344,26 @@ fn handle_command(
         "/chatbot" | "/cb" => {
             if let Some(new_chatbot) = parts.get(1) {
                 let new_chatbot = match *new_chatbot {
-                    "gemini" => GeminiChatbot::create(
-                        "gemini-1.5-flash".to_owned(),
-                        None,
-                    )?,
+                    "gemini" => {
+                        let (api_key, default_model) =
+                            config.as_ref().map_or_else(
+                                || (None, "gemini-1.5-flash".to_owned()),
+                                |config| {
+                                    let api_key =
+                                        config.api_keys.gemini.clone();
+                                    let default_model =
+                                        if config.default_chatbot.as_str()
+                                            == "gemini"
+                                        {
+                                            config.default_model.clone()
+                                        } else {
+                                            "gemini-1.5-flash".to_owned()
+                                        };
+                                    (api_key, default_model)
+                                },
+                            );
+                        GeminiChatbot::create(default_model, api_key)?
+                    }
                     "dummy" => DummyChatbot::create("1".to_owned(), None)?,
                     _ => {
                         printer.print_error_message("Invalid chatbot.")?;
