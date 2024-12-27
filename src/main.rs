@@ -255,13 +255,13 @@ async fn run_chat(
                                     "Failed to save history to file ({history_file:?}): {err}"
                                 )
                             ).map_err(ChatError::Print)?;
-                        } else {
-                            printer.print_error_message(
-                                &format!(
-                                    "Failed to save history to file ({history_file:?}): No history file specified."
-                                )
-                            ).map_err(ChatError::Print)?;
                         }
+                    } else {
+                        printer.print_error_message(
+                            &format!(
+                                "Failed to save history to file ({history_file:?}): No history file specified."
+                            )
+                        ).map_err(ChatError::Print)?;
                     }
                 }
                 return Err(err.into());
