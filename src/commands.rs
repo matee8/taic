@@ -139,6 +139,7 @@ impl<'parts> Command<'parts> {
                 Err(CommandCreationError::MissingFilename),
                 |filename| Ok(Self::Delete { filename }),
             ),
+            "/sessions" | "/se" => Ok(Self::Sessions),
             "/help" | "/h" => Ok(Self::Help),
             "/quit" | "/q" => Ok(Self::Quit),
             _ => Err(CommandCreationError::Invalid),
