@@ -242,26 +242,26 @@ impl<'parts> Command<'parts> {
                 }
             }
             Self::Save { filename } => {
-                context.session.save(filename)?;
+                context.session.save(filename, context.config)?;
                 context.printer.print_app_message(&format!(
                     "Session saved to {filename}.json"
                 ))?;
             }
             Self::Load { filename } => {
-                let loaded_session = Session::load(filename)?;
+                let loaded_session = Session::load(filename, context.config)?;
                 *context.session = loaded_session;
                 context.printer.print_app_message(&format!(
                     "Session loaded from {filename}.json"
                 ))?;
             }
             Self::Delete { filename } => {
-                Session::delete(filename)?;
+                Session::delete(filename, context.config)?;
                 context.printer.print_app_message(&format!(
                     "Session {filename}.json deleted."
                 ))?;
             }
             Self::Sessions => {
-                let sessions = Session::list_all()?;
+                let sessions = Session::list_all(context.config)?;
                 if sessions.is_empty() {
                     context
                         .printer

@@ -162,7 +162,7 @@ impl<'printer> App<'printer> {
 
     async fn run_repl(&mut self, config: Config) -> Result<(), ChatError> {
         let mut rl = DefaultEditor::new()?;
-        let history_file = history::locate_file()?;
+        let history_file = history::locate_file(&config)?;
         let user_prefix = self.printer.get_user_prefix();
 
         loop {
@@ -170,7 +170,7 @@ impl<'printer> App<'printer> {
                 Ok(line) => Ok(line),
                 Err(err) => {
                     if matches!(err, ReadlineError::Interrupted) {
-                        rl.save_history(&history_file)?;
+                        rl.save_history(&&*history_file)?;
                     }
                     Err(err)
                 }
@@ -198,7 +198,7 @@ impl<'printer> App<'printer> {
                         if let Err(err) = command.execute(&mut context) {
                             match err {
                                 CommandExecuteError::Quit => {
-                                    rl.save_history(&history_file)?;
+                                    rl.save_history(&&*history_file)?;
                                     break Err(ChatError::Quit);
                                 }
                                 CommandExecuteError::Print(_)

@@ -1,10 +1,11 @@
-use std::{env, ffi::OsStr, fs, path::PathBuf};
+use alloc::borrow::Cow;
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use futures::io;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{Message, Role};
+use crate::{config::Config, Message, Role};
 
 #[non_exhaustive]
 #[derive(Serialize, Deserialize, Default)]
@@ -43,8 +44,12 @@ impl Session {
     }
 
     #[inline]
-    pub fn save(&self, filename: &str) -> Result<(), SessionError> {
-        let session_dir = Self::get_dir_path()?;
+    pub fn save(
+        &self,
+        filename: &str,
+        config: &Config,
+    ) -> Result<(), SessionError> {
+        let session_dir = Self::get_dir_path(config)?;
         let file_path = session_dir.join(filename).with_extension("json");
         let serialized = serde_json::to_string(self)?;
 
@@ -54,8 +59,8 @@ impl Session {
     }
 
     #[inline]
-    pub fn load(filename: &str) -> Result<Self, SessionError> {
-        let session_dir = Self::get_dir_path()?;
+    pub fn load(filename: &str, config: &Config) -> Result<Self, SessionError> {
+        let session_dir = Self::get_dir_path(config)?;
         let file_path = session_dir.join(filename).with_extension("json");
         let file_content =
             fs::read_to_string(file_path).map_err(SessionError::ReadFile)?;
@@ -65,10 +70,10 @@ impl Session {
     }
 
     #[inline]
-    pub fn list_all() -> Result<Vec<String>, SessionError> {
-        let session_dir = Self::get_dir_path()?;
+    pub fn list_all(config: &Config) -> Result<Vec<String>, SessionError> {
+        let session_dir = Self::get_dir_path(config)?;
         let entries =
-            fs::read_dir(session_dir).map_err(SessionError::ReadDir)?;
+            fs::read_dir(&*session_dir).map_err(SessionError::ReadDir)?;
         let session_files: Vec<String> = entries
             .filter_map(Result::ok)
             .filter(|file| file.path().extension() == Some(OsStr::new("json")))
@@ -84,8 +89,8 @@ impl Session {
     }
 
     #[inline]
-    pub fn delete(filename: &str) -> Result<(), SessionError> {
-        let session_dir = Self::get_dir_path()?;
+    pub fn delete(filename: &str, config: &Config) -> Result<(), SessionError> {
+        let session_dir = Self::get_dir_path(config)?;
         let file_path = session_dir.join(filename).with_extension("json");
 
         if file_path.exists() {
@@ -102,10 +107,12 @@ impl Session {
         self.messages.push(Message::new(role, content));
     }
 
-    fn get_dir_path() -> Result<PathBuf, SessionError> {
-        let session_dir = if let Ok(env_dir) = env::var("LLMCLI_SESSION_DIR") {
-            PathBuf::from(env_dir)
-        } else {
+    fn get_dir_path(config: &Config) -> Result<Cow<'_, PathBuf>, SessionError> {
+        if let Some(ref path) = config.session_path {
+            return Ok(Cow::Borrowed(path));
+        }
+
+        let session_dir = {
             let data_dir = dirs::data_dir().ok_or(SessionError::DataDir)?;
             data_dir.join("llmcli_sessions")
         };
@@ -115,6 +122,6 @@ impl Session {
                 .map_err(SessionError::CreateDir)?;
         }
 
-        Ok(session_dir)
+        Ok(Cow::Owned(session_dir))
     }
 }

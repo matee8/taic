@@ -14,7 +14,7 @@ pub struct Args {
     pub system_prompt: Option<String>,
     #[arg(long, help = "Disable colored output")]
     pub no_color: bool,
-    #[arg(short, long, help = "Custom config file path", value_name = "FILE")]
+    #[arg(long, help = "Custom config file path", value_name = "FILE")]
     pub config: Option<PathBuf>,
     #[arg(
         help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode, only works if default_chatbot and default_model is set in configuration file)"

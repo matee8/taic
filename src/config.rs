@@ -36,22 +36,20 @@ pub struct Config {
     pub default_chatbot: Option<String>,
     pub default_models: Option<DefaultModels>,
     pub api_keys: Option<ApiKeys>,
+    pub session_path: Option<PathBuf>,
+    pub history_path: Option<PathBuf>,
 }
 
 impl Config {
     #[inline]
-    pub fn load(config_path: Option<PathBuf>) -> Result<Self, ConfigError> {
-        let config_path = if let Some(config_path) = config_path {
-            config_path
-        } else {
-            match Self::get_file_path() {
-                Ok(path) => path,
-                Err(ConfigError::NotFound) => {
-                    return Ok(Self::default());
-                }
-                Err(err) => {
-                    return Err(err);
-                }
+    pub fn load(cli_path: Option<PathBuf>) -> Result<Self, ConfigError> {
+        let config_path = match Self::get_file_path(cli_path) {
+            Ok(path) => path,
+            Err(ConfigError::NotFound) => {
+                return Ok(Self::default());
+            }
+            Err(err) => {
+                return Err(err);
             }
         };
 
@@ -69,23 +67,22 @@ impl Config {
     }
 
     #[inline]
-    pub fn save(
-        &self,
-        config_path: Option<PathBuf>,
-    ) -> Result<(), ConfigError> {
-        let config_path = if let Some(config_path) = config_path {
-            config_path
-        } else {
-            Self::get_file_path()?
-        };
+    pub fn save(&self, cli_path: Option<PathBuf>) -> Result<(), ConfigError> {
+        let config_path = Self::get_file_path(cli_path)?;
         let config_str = toml::to_string(self)?;
         fs::write(config_path, config_str)?;
         Ok(())
     }
 
-    fn get_file_path() -> Result<PathBuf, ConfigError> {
-        if let Ok(config_path) = env::var("LLMCLI_CONFIG_PATH") {
-            return Ok(PathBuf::from(config_path));
+    fn get_file_path(
+        cli_path: Option<PathBuf>,
+    ) -> Result<PathBuf, ConfigError> {
+        if let Some(path) = cli_path {
+            return Ok(path);
+        }
+
+        if let Ok(env_path) = env::var("LLMCLI_CONFIG_PATH") {
+            return Ok(PathBuf::from(env_path));
         }
 
         if let Some(config_dir) = dirs::config_dir() {
