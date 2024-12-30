@@ -163,6 +163,7 @@ impl<'printer> App<'printer> {
     async fn run_repl(&mut self, config: Config) -> Result<(), ChatError> {
         let mut rl = DefaultEditor::new()?;
         let history_file = history::locate_file(&config)?;
+        rl.load_history(&*history_file)?;
         let user_prefix = self.printer.get_user_prefix();
 
         loop {
