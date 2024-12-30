@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(propagate_version = true)]
 pub struct Args {
     #[command(subcommand)]
-    pub command: Option<Command>,
+    pub command: Option<ChatbotArg>,
     #[arg(short, long, help = "Set the system prompt")]
     pub system_prompt: Option<String>,
     #[arg(long, help = "Disable colored output")]
@@ -59,21 +59,12 @@ impl Display for GeminiModel {
 
 #[non_exhaustive]
 #[derive(Subcommand)]
-pub enum Command {
+pub enum ChatbotArg {
     #[command(about = "Chat with the Google Gemini chatbot")]
     Gemini {
         #[arg(short, long, value_enum, default_value_t = GeminiModel::Flash1_5)]
         model: GeminiModel,
-        #[arg(
-            help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode)"
-        )]
-        prompt: Option<String>,
     },
     #[command(about = "Chat with the Dummy chatbot")]
-    Dummy {
-        #[arg(
-            help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode)"
-        )]
-        prompt: Option<String>,
-    },
+    Dummy,
 }

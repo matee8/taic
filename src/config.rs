@@ -1,9 +1,22 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, fs::File, path::PathBuf};
 
 use futures::io;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::{de, ser};
+
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("{0}")]
+    De(#[from] de::Error),
+    #[error("{0}")]
+    Ser(#[from] ser::Error),
+    #[error("Config directory not found.")]
+    NotFound,
+}
 
 #[non_exhaustive]
 #[derive(Deserialize, Serialize)]
@@ -30,41 +43,33 @@ impl Default for Config {
     }
 }
 
-#[non_exhaustive]
-#[derive(Debug, Error)]
-pub enum ConfigLoadError {
-    #[error("{0}")]
-    Io(#[from] io::Error),
-    #[error("{0}")]
-    Toml(#[from] de::Error),
-}
-
-#[non_exhaustive]
-#[derive(Debug, Error)]
-pub enum ConfigSaveError {
-    #[error("{0}")]
-    Io(#[from] io::Error),
-    #[error("{0}")]
-    Toml(#[from] ser::Error),
-}
-
 impl Config {
     #[inline]
-    pub fn load(config_path: Option<PathBuf>) -> Result<Self, ConfigLoadError> {
+    pub fn load(
+        config_path: Option<PathBuf>,
+    ) -> Result<Option<Self>, ConfigError> {
         let config_path = if let Some(config_path) = config_path {
             config_path
         } else {
-            Self::get_file_path()?
+            match Self::get_file_path() {
+                Ok(path) => path,
+                Err(ConfigError::NotFound) => {
+                    return Ok(None);
+                }
+                Err(err) => {
+                    return Err(err);
+                }
+            }
         };
         let config_str = fs::read_to_string(config_path)?;
-        Ok(toml::from_str(&config_str)?)
+        Ok(Some(toml::from_str(&config_str)?))
     }
 
     #[inline]
     pub fn save(
         &self,
         config_path: Option<PathBuf>,
-    ) -> Result<(), ConfigSaveError> {
+    ) -> Result<(), ConfigError> {
         let config_path = if let Some(config_path) = config_path {
             config_path
         } else {
@@ -75,7 +80,7 @@ impl Config {
         Ok(())
     }
 
-    fn get_file_path() -> io::Result<PathBuf> {
+    fn get_file_path() -> Result<PathBuf, ConfigError> {
         if let Ok(config_path) = env::var("LLMCLI_CONFIG_PATH") {
             return Ok(PathBuf::from(config_path));
         }
@@ -87,12 +92,12 @@ impl Config {
                     fs::create_dir_all(parent)?;
                 }
             }
+            if !config_path.exists() {
+                File::create(&config_path)?;
+            }
             return Ok(config_path);
         }
 
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "Config directory not found",
-        ))
+        Err(ConfigError::NotFound)
     }
 }

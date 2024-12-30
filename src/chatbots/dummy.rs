@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use futures::{stream, StreamExt as _};
 
 use crate::{
-    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError,
+    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError,
     ResponseStream, Role,
 };
 
@@ -66,7 +66,7 @@ impl Chatbot for DummyChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<ResponseStream, ChatbotError> {
+    ) -> Result<ResponseStream, ChatbotChatError> {
         let msg = messages.last().map_or_else(
             || "Dummy response to empty conversation.".to_owned(),
             |last_msg| {

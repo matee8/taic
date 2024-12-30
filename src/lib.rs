@@ -11,12 +11,15 @@ use thiserror::Error;
 
 pub mod chatbots;
 pub mod cli;
+pub mod commands;
 pub mod config;
+pub mod history;
 pub mod session;
 pub mod ui;
 
-type ResponseStream =
-    Pin<Box<dyn Stream<Item = Result<String, ChatbotError>> + Send + 'static>>;
+type ResponseStream = Pin<
+    Box<dyn Stream<Item = Result<String, ChatbotChatError>> + Send + 'static>,
+>;
 
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
@@ -45,7 +48,7 @@ impl Message {
 
 #[non_exhaustive]
 #[derive(Debug, Error)]
-pub enum ChatbotError {
+pub enum ChatbotChatError {
     #[error("Timeout.")]
     Timeout,
     #[error("Network error: {0}.")]
@@ -93,5 +96,5 @@ pub trait Chatbot {
     async fn send_message(
         &self,
         messages: &[Message],
-    ) -> Result<ResponseStream, ChatbotError>;
+    ) -> Result<ResponseStream, ChatbotChatError>;
 }

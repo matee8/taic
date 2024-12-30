@@ -7,7 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Chatbot, ChatbotCreationError, ChatbotError, InvalidModelError,
+    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError,
     ResponseStream, Role,
 };
 
@@ -147,7 +147,7 @@ impl Chatbot for GeminiChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<ResponseStream, ChatbotError> {
+    ) -> Result<ResponseStream, ChatbotChatError> {
         let system = messages.iter().find(|msg| msg.role == Role::System).map(
             |system_prompt| SystemInstruction {
                 parts: vec![GeminiPart {
@@ -180,9 +180,9 @@ impl Chatbot for GeminiChatbot {
             .await
             .map_err(|err| {
                 if err.is_timeout() {
-                    ChatbotError::Timeout
+                    ChatbotChatError::Timeout
                 } else {
-                    ChatbotError::NetworkError(err)
+                    ChatbotChatError::NetworkError(err)
                 }
             })?
             .bytes_stream();
@@ -207,8 +207,9 @@ impl Chatbot for GeminiChatbot {
                         "#
                     )]
                     let gemini_resp: GeminiResponse<'_> =
-                        serde_json::from_slice(&bytes[5..])
-                            .map_err(|_| ChatbotError::UnexpectedResponse)?;
+                        serde_json::from_slice(&bytes[5..]).map_err(|_| {
+                            ChatbotChatError::UnexpectedResponse
+                        })?;
 
                     Ok(gemini_resp
                         .candidates
@@ -223,10 +224,10 @@ impl Chatbot for GeminiChatbot {
                                 .map(|part| Ok(part.text.into_owned()))
                         })
                         .unwrap_or_else(|| {
-                            Err(ChatbotError::UnexpectedResponse)
+                            Err(ChatbotChatError::UnexpectedResponse)
                         })?)
                 }
-                Err(_) => Err(ChatbotError::UnexpectedResponse),
+                Err(_) => Err(ChatbotChatError::UnexpectedResponse),
             })
             .boxed();
 

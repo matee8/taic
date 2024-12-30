@@ -4,7 +4,7 @@ use futures::io;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::Message;
+use crate::{Message, Role};
 
 #[non_exhaustive]
 #[derive(Serialize, Deserialize, Default)]
@@ -95,6 +95,11 @@ impl Session {
         } else {
             Err(SessionError::NotFound)
         }
+    }
+
+    #[inline]
+    pub fn add_message(&mut self, role: Role, content: String) {
+        self.messages.push(Message::new(role, content));
     }
 
     fn get_dir_path() -> Result<PathBuf, SessionError> {
