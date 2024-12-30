@@ -181,6 +181,8 @@ impl<'printer> App<'printer> {
             }
 
             if input.starts_with('/') {
+                rl.add_history_entry(&input)?;
+
                 let parts: Vec<&str> = input.split_whitespace().collect();
 
                 let command = Command::from_parts(&parts);
