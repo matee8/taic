@@ -25,44 +25,43 @@ pub struct ApiKeys {
 }
 
 #[non_exhaustive]
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Config {
-    pub default_chatbot: String,
-    pub default_model: String,
-    pub api_keys: ApiKeys,
-}
-
-impl Default for Config {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            default_chatbot: "gemini".to_owned(),
-            default_model: "gemini-1.5-flash".to_owned(),
-            api_keys: ApiKeys { gemini: None },
-        }
-    }
+    pub default_chatbot: Option<String>,
+    pub default_model: Option<String>,
+    pub api_keys: Option<ApiKeys>,
 }
 
 impl Config {
     #[inline]
     pub fn load(
         config_path: Option<PathBuf>,
-    ) -> Result<Option<Self>, ConfigError> {
+    ) -> Result<Self, ConfigError> {
         let config_path = if let Some(config_path) = config_path {
             config_path
         } else {
             match Self::get_file_path() {
                 Ok(path) => path,
                 Err(ConfigError::NotFound) => {
-                    return Ok(None);
+                    return Ok(Self::default());
                 }
                 Err(err) => {
                     return Err(err);
                 }
             }
         };
+
+        if !config_path.exists() {
+            return Ok(Self::default());
+        }
+
         let config_str = fs::read_to_string(config_path)?;
-        Ok(Some(toml::from_str(&config_str)?))
+
+        if config_str.trim().is_empty() {
+            return Ok(Self::default())
+        }
+
+        Ok(toml::from_str(&config_str)?)
     }
 
     #[inline]

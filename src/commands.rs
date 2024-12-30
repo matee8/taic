@@ -45,7 +45,7 @@ pub struct CommandContext<'parts, 'session, 'chatbot, 'printer, 'config> {
     session: &'session mut Session,
     chatbot: &'chatbot mut Box<dyn Chatbot>,
     printer: &'printer Printer,
-    config: Option<&'config Config>,
+    config: &'config Config,
 }
 
 impl<'parts, 'session, 'chatbot, 'printer, 'config>
@@ -58,7 +58,7 @@ impl<'parts, 'session, 'chatbot, 'printer, 'config>
         session: &'session mut Session,
         chatbot: &'chatbot mut Box<dyn Chatbot>,
         printer: &'printer Printer,
-        config: Option<&'config Config>,
+        config: &'config Config,
     ) -> Self {
         Self {
             parts,
@@ -166,23 +166,15 @@ impl<'parts> Command<'parts> {
             Self::SwitchChatbot { name } => {
                 let new_chatbot = match name {
                     "gemini" => {
-                        let (api_key, default_model) =
-                            context.config.as_ref().map_or_else(
-                                || (None, "gemini-1.5-flash".to_owned()),
-                                |config| {
-                                    let api_key =
-                                        config.api_keys.gemini.clone();
-                                    let default_model =
-                                        if config.default_chatbot.as_str()
-                                            == "gemini"
-                                        {
-                                            config.default_model.clone()
-                                        } else {
-                                            "gemini-1.5-flash".to_owned()
-                                        };
-                                    (api_key, default_model)
-                                },
-                            );
+                        let api_key = context.config
+                            .api_keys
+                            .as_ref()
+                            .and_then(|api_keys| api_keys.gemini.clone());
+                        let default_model = context.config
+                            .default_model
+                            .clone()
+                            .unwrap_or_else(|| "gemini-1.5-flash".to_owned());
+
                         GeminiChatbot::create(default_model, api_key)?
                     }
                     "dummy" => DummyChatbot::create("1".to_owned(), None)?,

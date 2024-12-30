@@ -29,7 +29,7 @@ async fn main() {
         process::exit(1);
     });
     let chatbot =
-        create_chatbot(args.command, config.as_ref()).unwrap_or_else(|err| {
+        create_chatbot(args.command, &config).unwrap_or_else(|err| {
             if let Err(err) = printer.print_error_message(&err.to_string()) {
                 eprintln!("Error: {err}");
             }
@@ -64,28 +64,40 @@ async fn main() {
 
 fn create_chatbot(
     chatbot: Option<ChatbotArg>,
-    config: Option<&Config>,
+    config: &Config,
 ) -> Result<Box<dyn Chatbot>, ChatbotCreationError> {
     match chatbot {
         Some(ChatbotArg::Gemini { model }) => {
             let api_key = config
+                .api_keys
                 .as_ref()
-                .and_then(|config| config.api_keys.gemini.clone());
+                .and_then(|api_keys| api_keys.gemini.clone());
+
             GeminiChatbot::create(model.to_string(), api_key)
         }
         Some(ChatbotArg::Dummy) => DummyChatbot::create(String::new(), None),
         Some(_) => Err(ChatbotCreationError::UnknownChatbot),
-        None => config.as_ref().map_or_else(
-            || Err(ChatbotCreationError::UnknownChatbot),
-            |config| match config.default_chatbot.as_str() {
+        None => {
+            let default_chatbot = config
+                .default_chatbot
+                .as_ref()
+                .ok_or(ChatbotCreationError::UnknownChatbot)?;
+
+            let api_keys = config.api_keys.as_ref();
+
+            match default_chatbot.as_str() {
                 "gemini" => GeminiChatbot::create(
-                    config.default_model.clone(),
-                    config.api_keys.gemini.clone(),
+                    config
+                        .default_model
+                        .clone()
+                        .unwrap_or_else(|| "gemini-1.5-flash".to_owned()),
+                    api_keys
+                        .and_then(|api_keys| api_keys.gemini.clone()),
                 ),
                 "dummy" => DummyChatbot::create(String::new(), None),
                 _ => Err(ChatbotCreationError::UnknownChatbot),
-            },
-        ),
+            }
+        }
     }
 }
 
@@ -151,7 +163,7 @@ impl<'printer> App<'printer> {
 
     async fn run_repl(
         &mut self,
-        config: Option<Config>,
+        config: Config,
     ) -> Result<(), ChatError> {
         let mut rl = DefaultEditor::new()?;
         let history_file = history::locate_file()?;
@@ -184,7 +196,7 @@ impl<'printer> App<'printer> {
                             &mut self.session,
                             &mut self.chatbot,
                             self.printer,
-                            config.as_ref(),
+                            &config,
                         );
 
                         if let Err(err) = command.execute(&mut context) {
