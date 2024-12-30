@@ -28,13 +28,12 @@ async fn main() {
         }
         process::exit(1);
     });
-    let chatbot =
-        create_chatbot(args.command, &config).unwrap_or_else(|err| {
-            if let Err(err) = printer.print_error_message(&err.to_string()) {
-                eprintln!("Error: {err}");
-            }
-            process::exit(1);
-        });
+    let chatbot = create_chatbot(args.command, &config).unwrap_or_else(|err| {
+        if let Err(err) = printer.print_error_message(&err.to_string()) {
+            eprintln!("Error: {err}");
+        }
+        process::exit(1);
+    });
 
     let mut session = Session::new();
 
@@ -88,11 +87,11 @@ fn create_chatbot(
             match default_chatbot.as_str() {
                 "gemini" => GeminiChatbot::create(
                     config
-                        .default_model
-                        .clone()
-                        .unwrap_or_else(|| "gemini-1.5-flash".to_owned()),
-                    api_keys
-                        .and_then(|api_keys| api_keys.gemini.clone()),
+                        .default_models
+                        .as_ref()
+                        .and_then(|models| models.gemini.clone())
+                        .ok_or(ChatbotCreationError::UnknownModel)?,
+                    api_keys.and_then(|api_keys| api_keys.gemini.clone()),
                 ),
                 "dummy" => DummyChatbot::create(String::new(), None),
                 _ => Err(ChatbotCreationError::UnknownChatbot),
@@ -161,10 +160,7 @@ impl<'printer> App<'printer> {
         Ok(())
     }
 
-    async fn run_repl(
-        &mut self,
-        config: Config,
-    ) -> Result<(), ChatError> {
+    async fn run_repl(&mut self, config: Config) -> Result<(), ChatError> {
         let mut rl = DefaultEditor::new()?;
         let history_file = history::locate_file()?;
         let user_prefix = self.printer.get_user_prefix();

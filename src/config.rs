@@ -25,18 +25,22 @@ pub struct ApiKeys {
 }
 
 #[non_exhaustive]
+#[derive(Deserialize, Serialize)]
+pub struct DefaultModels {
+    pub gemini: Option<String>,
+}
+
+#[non_exhaustive]
 #[derive(Deserialize, Serialize, Default)]
 pub struct Config {
     pub default_chatbot: Option<String>,
-    pub default_model: Option<String>,
+    pub default_models: Option<DefaultModels>,
     pub api_keys: Option<ApiKeys>,
 }
 
 impl Config {
     #[inline]
-    pub fn load(
-        config_path: Option<PathBuf>,
-    ) -> Result<Self, ConfigError> {
+    pub fn load(config_path: Option<PathBuf>) -> Result<Self, ConfigError> {
         let config_path = if let Some(config_path) = config_path {
             config_path
         } else {
@@ -58,7 +62,7 @@ impl Config {
         let config_str = fs::read_to_string(config_path)?;
 
         if config_str.trim().is_empty() {
-            return Ok(Self::default())
+            return Ok(Self::default());
         }
 
         Ok(toml::from_str(&config_str)?)
