@@ -127,15 +127,15 @@ impl<'parts> Command<'parts> {
                 }),
             "/list_models" | "/lm" => Ok(Self::ListModels),
             "/info" | "/i" => Ok(Self::Info),
-            "/save" | "/s" => parts.first().map_or(
+            "/save" | "/s" => parts.get(1).map_or(
                 Err(CommandCreationError::MissingFilename),
                 |filename| Ok(Self::Save { filename }),
             ),
-            "/load" | "/l" => parts.first().map_or(
+            "/load" | "/l" => parts.get(1).map_or(
                 Err(CommandCreationError::MissingFilename),
                 |filename| Ok(Self::Load { filename }),
             ),
-            "/delete" | "/d" => parts.first().map_or(
+            "/delete" | "/d" => parts.get(1).map_or(
                 Err(CommandCreationError::MissingFilename),
                 |filename| Ok(Self::Delete { filename }),
             ),
