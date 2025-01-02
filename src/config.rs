@@ -38,6 +38,7 @@ pub struct Config {
     pub api_keys: Option<ApiKeys>,
     pub session_path: Option<PathBuf>,
     pub history_path: Option<PathBuf>,
+    pub markdown_disabled: Option<bool>,
 }
 
 impl Config {

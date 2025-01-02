@@ -20,6 +20,8 @@ pub struct Args {
         help = "Input prompt (optional, reads from stdin if `-`, no prompt starts interactive mode, only works if default_chatbot and default_model is set in configuration file)"
     )]
     pub prompt: Option<String>,
+    #[arg(long, help = "Disable markdown rendering")]
+    pub no_markdown: Option<bool>,
 }
 
 #[non_exhaustive]

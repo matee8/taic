@@ -40,7 +40,11 @@ async fn main() {
         session.add_message(Role::System, system_prompt);
     }
 
-    let mut app = App::new(chatbot, &printer, session);
+    let markdown_disabled = args
+        .no_markdown
+        .unwrap_or_else(|| config.markdown_disabled.unwrap_or_default());
+
+    let mut app = App::new(chatbot, &printer, session, markdown_disabled);
 
     let res = if let Some(prompt) = args.prompt {
         app.run_single_prompt(prompt).await
@@ -119,6 +123,7 @@ struct App<'printer> {
     chatbot: Box<dyn Chatbot>,
     printer: &'printer Printer,
     session: Session,
+    markdown_disabled: bool,
 }
 
 impl<'printer> App<'printer> {
@@ -126,11 +131,13 @@ impl<'printer> App<'printer> {
         chatbot: Box<dyn Chatbot>,
         printer: &'printer Printer,
         session: Session,
+        markdown_disabled: bool,
     ) -> Self {
         Self {
             chatbot,
             printer,
             session,
+            markdown_disabled,
         }
     }
 
@@ -239,7 +246,11 @@ impl<'printer> App<'printer> {
     async fn handle_chat_message(&mut self) -> Result<(), ChatError> {
         let result = self.chatbot.send_message(&self.session.messages).await?;
 
-        print!("{result}");
+        if self.markdown_disabled {
+            print!("{result}");
+        } else {
+            termimad::print_text(&result);
+        }
 
         self.session.add_message(Role::Assistant, result);
 
