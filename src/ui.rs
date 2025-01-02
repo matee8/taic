@@ -22,10 +22,10 @@ impl Printer {
     #[must_use]
     pub fn get_user_prefix(&self) -> String {
         if self.no_color {
-            "You: ".to_owned()
+            "You:\n".to_owned()
         } else {
             format!(
-                "{}{}You: {}{}",
+                "{}{}You:{}{}\n",
                 SetForegroundColor(Color::Magenta),
                 SetAttribute(Attribute::Bold),
                 ResetColor,
@@ -37,14 +37,14 @@ impl Printer {
     #[inline]
     pub fn print_app_message(&self, message: &str) -> io::Result<()> {
         if self.no_color {
-            println!("llmcli: {message}");
+            println!("llmcli:\n{message}");
             Ok(())
         } else {
             execute!(
                 io::stdout(),
                 SetForegroundColor(Color::Blue),
                 SetAttribute(Attribute::Bold),
-                Print("llmcli: "),
+                Print("llmcli:\n"),
                 ResetColor,
                 SetAttribute(Attribute::Reset),
                 Print(message),
@@ -56,7 +56,7 @@ impl Printer {
     #[inline]
     pub fn print_chatbot_prefix(&self, name: &str) -> io::Result<()> {
         if self.no_color {
-            print!("{name}: ");
+            println!("{name}:");
             Ok(())
         } else {
             execute!(
@@ -64,7 +64,7 @@ impl Printer {
                 SetForegroundColor(Color::Cyan),
                 SetAttribute(Attribute::Bold),
                 Print(name),
-                Print(": "),
+                Print(":\n"),
                 ResetColor,
                 SetAttribute(Attribute::Reset),
             )
@@ -74,14 +74,14 @@ impl Printer {
     #[inline]
     pub fn print_error_message(&self, message: &str) -> io::Result<()> {
         if self.no_color {
-            println!("Error: {message}");
+            println!("Error:\n{message}");
             Ok(())
         } else {
             execute!(
                 io::stdout(),
                 SetForegroundColor(Color::Red),
                 SetAttribute(Attribute::Bold),
-                Print("Error: "),
+                Print("Error:\n"),
                 ResetColor,
                 SetAttribute(Attribute::Reset),
                 Print(message),

@@ -166,7 +166,8 @@ impl<'printer> App<'printer> {
         let user_prefix = self.printer.get_user_prefix();
 
         loop {
-            let input = match rl.readline(&user_prefix) {
+            print!("{user_prefix}");
+            let input = match rl.readline("") {
                 Ok(line) => Ok(line),
                 Err(err) => {
                     if matches!(err, ReadlineError::Interrupted) {
