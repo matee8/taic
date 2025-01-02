@@ -2,13 +2,11 @@ use alloc::borrow::Cow;
 use std::env;
 
 use async_trait::async_trait;
-use futures::StreamExt as _;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError,
-    ResponseStream, Role,
+    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError, Role,
 };
 
 const GEMINI_BASE_URL: &str =
@@ -83,7 +81,7 @@ impl Chatbot for GeminiChatbot {
         }
 
         let url =
-            format!("{GEMINI_BASE_URL}{model}:streamGenerateContent?alt=sse&key={api_key}");
+            format!("{GEMINI_BASE_URL}{model}:generateContent?key={api_key}");
 
         let client = Client::new();
 
@@ -136,7 +134,7 @@ impl Chatbot for GeminiChatbot {
         self.model = new_model;
 
         self.url = format!(
-            "{GEMINI_BASE_URL}{}:streamGenerateContent?alt=sse&key={}",
+            "{GEMINI_BASE_URL}{}:generateContent?key={}",
             self.model, self.api_key
         );
 
@@ -147,7 +145,7 @@ impl Chatbot for GeminiChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<ResponseStream, ChatbotChatError> {
+    ) -> Result<String, ChatbotChatError> {
         let system = messages.iter().find(|msg| msg.role == Role::System).map(
             |system_prompt| SystemInstruction {
                 parts: vec![GeminiPart {
@@ -184,53 +182,39 @@ impl Chatbot for GeminiChatbot {
                 } else {
                     ChatbotChatError::NetworkError(err)
                 }
-            })?
-            .bytes_stream();
+            })?;
 
-        let stream = resp_stream
-            .map(move |item| match item {
-                Ok(bytes) => {
-                    #[expect(
-                        clippy::map_err_ignore,
-                        reason = r#"
+        match resp_stream.text().await {
+            Ok(payload) => {
+                #[expect(
+                    clippy::map_err_ignore,
+                    reason = r#"
                             Invalid JSON from the API indicates a critical error
                             so we hide that detail from the end user, as they
                             cannot address this issue.
                         "#
-                    )]
-                    #[expect(
-                        clippy::indexing_slicing,
-                        reason = r#"
-                            The Gemini API prepends "data: " to each JSON
-                            chunk in the stream. We need to remove this
-                            non-JSON prefix before deserialization.
-                        "#
-                    )]
-                    let gemini_resp: GeminiResponse<'_> =
-                        serde_json::from_slice(&bytes[5..]).map_err(|_| {
-                            ChatbotChatError::UnexpectedResponse
-                        })?;
+                )]
+                let gemini_resp: GeminiResponse<'_> =
+                    serde_json::from_str(&payload)
+                        .map_err(|_| ChatbotChatError::UnexpectedResponse)?;
 
-                    Ok(gemini_resp
-                        .candidates
-                        .into_iter()
-                        .next()
-                        .and_then(|candidate| {
-                            candidate
-                                .content
-                                .parts
-                                .into_iter()
-                                .next()
-                                .map(|part| Ok(part.text.into_owned()))
-                        })
-                        .unwrap_or_else(|| {
-                            Err(ChatbotChatError::UnexpectedResponse)
-                        })?)
-                }
-                Err(_) => Err(ChatbotChatError::UnexpectedResponse),
-            })
-            .boxed();
-
-        Ok(stream)
+                Ok(gemini_resp
+                    .candidates
+                    .into_iter()
+                    .next()
+                    .and_then(|candidate| {
+                        candidate
+                            .content
+                            .parts
+                            .into_iter()
+                            .next()
+                            .map(|part| Ok(part.text.into_owned()))
+                    })
+                    .unwrap_or_else(|| {
+                        Err(ChatbotChatError::UnexpectedResponse)
+                    })?)
+            }
+            Err(_) => Err(ChatbotChatError::UnexpectedResponse),
+        }
     }
 }

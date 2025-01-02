@@ -4,7 +4,6 @@ use std::{
 };
 
 use clap::Parser as _;
-use futures::StreamExt as _;
 use llmcli::{
     chatbots::{dummy::DummyChatbot, gemini::GeminiChatbot},
     cli::{Args, ChatbotArg},
@@ -237,24 +236,11 @@ impl<'printer> App<'printer> {
     }
 
     async fn handle_chat_message(&mut self) -> Result<(), ChatError> {
-        let mut full_resp = String::new();
+        let result = self.chatbot.send_message(&self.session.messages).await?;
 
-        let mut stream =
-            self.chatbot.send_message(&self.session.messages).await?;
+        print!("{result}");
 
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(text) => {
-                    print!("{text}");
-                    full_resp.push_str(&text);
-                }
-                Err(err) => {
-                    return Err(err.into());
-                }
-            }
-        }
-
-        self.session.add_message(Role::Assistant, full_resp);
+        self.session.add_message(Role::Assistant, result);
 
         Ok(())
     }

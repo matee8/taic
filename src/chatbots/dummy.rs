@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use futures::{stream, StreamExt as _};
 
 use crate::{
-    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError,
-    ResponseStream, Role,
+    Chatbot, ChatbotChatError, ChatbotCreationError, InvalidModelError, Role,
 };
 
 const AVAILABLE_MODELS: [&str; 2] = ["1", "2"];
@@ -66,7 +64,7 @@ impl Chatbot for DummyChatbot {
     async fn send_message(
         &self,
         messages: &[crate::Message],
-    ) -> Result<ResponseStream, ChatbotChatError> {
+    ) -> Result<String, ChatbotChatError> {
         let msg = messages.last().map_or_else(
             || "Dummy response to empty conversation.".to_owned(),
             |last_msg| {
@@ -78,8 +76,6 @@ impl Chatbot for DummyChatbot {
             },
         );
 
-        let stream = stream::iter(vec![Ok(msg)]).boxed();
-
-        Ok(stream)
+        Ok(msg)
     }
 }

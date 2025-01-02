@@ -1,11 +1,9 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use core::pin::Pin;
 use std::env::VarError;
 
 use async_trait::async_trait;
-use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -16,10 +14,6 @@ pub mod config;
 pub mod history;
 pub mod session;
 pub mod ui;
-
-type ResponseStream = Pin<
-    Box<dyn Stream<Item = Result<String, ChatbotChatError>> + Send + 'static>,
->;
 
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone, Copy)]
@@ -96,5 +90,5 @@ pub trait Chatbot {
     async fn send_message(
         &self,
         messages: &[Message],
-    ) -> Result<ResponseStream, ChatbotChatError>;
+    ) -> Result<String, ChatbotChatError>;
 }
