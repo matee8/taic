@@ -24,6 +24,7 @@ lto = "fat"
 panic = "abort"
 
 [dependencies]
+assert_fs = "1.1.2"
 clap = { version = "4.5.27", features = ["derive"] }
 config = "0.15.6"
 dirs = "6.0.0"
@@ -89,3 +90,4 @@ absolute_paths = "allow"
 shadow_reuse = "allow"
 default_numeric_fallback = "allow"
 use_debug = "allow"
+exit = "allow"
